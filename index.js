@@ -75,20 +75,44 @@ function parseAssistantJson(responseData) {
     return JSON.parse(jsonText);
 }
 
-// --- Narration number check (madde 8): every number the model writes must come from the verified facts. ---
-// Facts = the JSON sent to the model WITHOUT route coordinates. Numbers may be rounded to 0-2 decimals,
-// written as absolute values, or converted m -> km. Both "51,062.4 / 13.4" and Turkish "51.062 / 13,4" formats are read.
-const NUM_TOKEN = /\d[\d.,]*\d|\d/g;
-function allowedNarrationNumbers(facts) {
-    const out = new Set([0, 1]);
-    const add = v => { for (const x of [v, Math.abs(v), v / 1000, Math.abs(v) / 1000]) for (const d of [0, 1, 2]) out.add(Number(x.toFixed(d))); };
-    const walk = v => {
-        if (typeof v === 'number' && Number.isFinite(v)) add(v);
-        else if (Array.isArray(v)) v.forEach(walk);
-        else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+// --- Narration number check (soft version, PR #1 review) ---
+// Only numbers WITH a physical unit (°, °C, K, m, km, m/s, Pa, %, mSv, mGy) are checked; unitless numbers
+// (counts, hours like 13:00, "8-connected", Ls, sol numbers) are never rejected.
+// A unit number passes if it is within 2% (or 0.05 absolute) of a fact with a matching unit/key, also after m <-> km
+// conversion, so rounding like "about 36 km" is fine. Facts = JSON sent to the model WITHOUT route coordinates.
+// If a sentence contains an unsupported unit number, ONLY that sentence is removed; the rest of the model text stays.
+// The whole narration is replaced by the template only if its structure is invalid or "why" becomes empty.
+const UNIT_NUMBER = /(-?\d[\d.,]*\d|-?\d)\s*(°\s?C|°|K\b|km\b|m\/s|m\b|Pa\b|%|mSv|mGy)/g;
+// Which fact keys a unit may be compared with (unit-aware, so "27.3°" is only checked against angles).
+const UNIT_KEYS = [
+    [/^°\s?C$/, /_c$|temp/],
+    [/^K$/, /_k$|temp/],
+    [/^°$/, /deg|slope|angle/],
+    [/^km$|^m$/, /_m$|_m_|distance|ascent|descent|elevation_(start|end)/],
+    [/^m\/s$/, /wind/],
+    [/^Pa$/, /pa$|pressure/],
+    [/^%$/, /pct|share|percent|humidity/],
+    [/^mSv$/, /msv/],
+    [/^mGy$/, /mgy/]
+];
+function factNumbers(facts) {
+    const out = [];
+    const walk = (v, key) => {
+        if (typeof v === 'number' && Number.isFinite(v)) out.push({ key, v });
+        else if (Array.isArray(v)) v.forEach(x => walk(x, key));
+        else if (v && typeof v === 'object') Object.entries(v).forEach(([k, x]) => walk(x, key ? `${key}.${k}` : k));
     };
-    walk(facts);
-    return out;
+    walk(facts, '');
+    return out.map(x => ({ key: x.key.toLowerCase(), v: x.v }));
+}
+function candidatesFor(unit, facts) {
+    const u = unit.replace(/\s/g, '');
+    const rule = UNIT_KEYS.find(([re]) => re.test(u));
+    const pick = rule ? facts.filter(f => rule[1].test(f.key)) : facts;
+    const vals = pick.map(f => f.v);
+    if (u === 'km') return vals.flatMap(v => [v, v / 1000]);
+    if (u === 'm') return vals.flatMap(v => [v, v * 1000]);
+    return vals;
 }
 function tokenReadings(token) {
     const readings = new Set();
@@ -98,29 +122,27 @@ function tokenReadings(token) {
     if (Number.isFinite(tr)) readings.add(tr);
     return [...readings];
 }
-function narrationStrings(n) {
-    const out = [];
-    const walk = v => {
-        if (typeof v === 'string') out.push(v);
-        else if (Array.isArray(v)) v.forEach(walk);
-        else if (v && typeof v === 'object') Object.values(v).forEach(walk);
-    };
-    walk(n);
-    return out;
+function numberSupported(token, unit, facts) {
+    const known = candidatesFor(unit, facts);
+    return tokenReadings(token).some(v => known.some(k => {
+        const a = Math.abs(v), b = Math.abs(k);
+        return Math.abs(a - b) <= Math.max(0.051, 0.02 * b);
+    }));
 }
-function narrationProblems(narration, facts) {
-    if (!narration || typeof narration.why !== 'string' || !Array.isArray(narration.factors) ||
-        !narration.environment || typeof narration.environment !== 'object' || typeof narration.navigation !== 'string') {
-        return ['invalid narration structure'];
-    }
-    const allowed = allowedNarrationNumbers(facts);
-    const problems = [];
-    for (const text of narrationStrings(narration)) {
-        for (const token of text.match(NUM_TOKEN) || []) {
-            if (!tokenReadings(token).some(v => allowed.has(Number(v.toFixed(2))) || allowed.has(v))) problems.push(`unsupported number ${token}`);
-        }
-    }
-    return problems;
+function unsupportedIn(text, known) {
+    const bad = [];
+    for (const m of String(text).matchAll(UNIT_NUMBER)) if (!numberSupported(m[1], m[2], known)) bad.push(m[0].trim());
+    return bad;
+}
+function filterText(text, known, problems) {
+    if (typeof text !== 'string') return text;
+    const sentences = text.split(/(?<=[.!?])\s+/);
+    const kept = sentences.filter(sentence => {
+        const bad = unsupportedIn(sentence, known);
+        if (bad.length) problems.push(`removed sentence with unsupported value(s): ${bad.join(', ')}`);
+        return !bad.length;
+    });
+    return kept.join(' ').trim();
 }
 function weatherSummary(w) {
     if (!w || !w.available) return 'not available';
@@ -151,9 +173,22 @@ function templateNarration(facts) {
     };
 }
 function checkedNarration(narration, facts) {
-    const problems = narrationProblems(narration, facts);
-    if (problems.length) return { narration: templateNarration(facts), source: 'template', problems };
-    return { narration, source: 'model', problems: [] };
+    if (!narration || typeof narration.why !== 'string' || !Array.isArray(narration.factors) ||
+        !narration.environment || typeof narration.environment !== 'object' || typeof narration.navigation !== 'string') {
+        return { narration: templateNarration(facts), source: 'template', problems: ['invalid narration structure'] };
+    }
+    const known = factNumbers(facts);
+    const problems = [];
+    const out = {
+        why: filterText(narration.why, known, problems),
+        factors: narration.factors
+            .map(f => (f && typeof f === 'object' ? { ...f, value: filterText(f.value, known, problems), effect: filterText(f.effect, known, problems) } : f))
+            .filter(f => f && typeof f.name === 'string' && f.value),
+        environment: Object.fromEntries(Object.entries(narration.environment).map(([k, v]) => [k, filterText(v, known, problems)])),
+        navigation: filterText(narration.navigation, known, problems)
+    };
+    if (!out.why) return { narration: templateNarration(facts), source: 'template', problems: [...problems, 'why empty after filtering'] };
+    return { narration: out, source: problems.length ? 'model_filtered' : 'model', problems };
 }
 
 function fallbackNavigationStep(waypoint) {
