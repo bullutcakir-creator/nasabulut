@@ -1,0 +1,90 @@
+{
+ "generated_utc": "2026-11-14T12:35:37+00:00",
+ "grid": {
+  "rows": 966,
+  "cols": 966,
+  "cell_map_m": [
+   60.0,
+   60.0
+  ],
+  "aggregation_px": 3,
+  "origin_map_m": {
+   "x_left": 4338939.999999998,
+   "y_top": 1120240.0000000028
+  },
+  "crs_proj4": "+proj=eqc +lat_ts=18.4663 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +R=3396190 +units=m +no_defs=True",
+  "sphere_radius_m": 3396190.0,
+  "lat_ts_deg": 18.4663,
+  "bounds_lonlat": {
+   "west": 77.1742341333914,
+   "east": 78.20513536972362,
+   "south": 17.92130612867868,
+   "north": 18.899126386255038
+  },
+  "side_ground_m": {
+   "east_west_at_centre_lat": 57978.990873400195,
+   "north_south": 57960.0
+  },
+  "area_km2_approx": 3360.4623110222756,
+  "lonlat_convention": "Mars 2000 sphere, planetocentric latitude, east-positive longitude (degrees)",
+  "centre": {
+   "lat": 18.41,
+   "lon": 77.69,
+   "source": "IAU Gazetteer of Planetary Nomenclature, feature 'Jezero'"
+  }
+ },
+ "slope": {
+  "computed_from": "CTX DEM 20 m pixels; central differences (numpy.gradient)",
+  "horizontal_spacing": "north-south 20 m; east-west 20 m * cos(lat)/cos(lat_ts) per row (eqc map metres are true only at lat_ts)",
+  "vertical_units": "metres (USGS product page: 'Vertical Coordinate System Units: Meters')",
+  "cell_rule": "routing cell = 3x3 DEM pixels; passability uses max 20 m slope in cell, reporting uses mean",
+  "limit_deg": 20.0,
+  "limit_note": "Prototype heuristic chosen by the team; not a NASA standard."
+ },
+ "stats": {
+  "dem_nodata_frac_in_area": 0.0,
+  "cells_total": 933156,
+  "cells_unknown": 0,
+  "cells_steeper_than_limit": 69210,
+  "cells_passable": 863946,
+  "cells_hirise": 79514,
+  "cells_hirise_blocked": 9840,
+  "cells_hirise_blocked_by_hirise_only": 6500
+ },
+ "dem": {
+  "file": "M20_JezeroCrater_CTXDEM_20m.tif",
+  "bytes": 90345300,
+  "size_px": [
+   4456,
+   5067
+  ],
+  "crs_wkt": "PROJCS[\"Jezero_Crater_Projection\",GEOGCS[\"GCS_Mars_2000_Sphere\",DATUM[\"Mars_2000_(Sphere)\",SPHEROID[\"Mars_2000_Sphere\",3396190,0]],PRIMEM[\"Reference_Meridian\",0],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]]],PROJECTION[\"Equirectangular\"],PARAMETER[\"standard_parallel_1\",18.4663],PARAMETER[\"central_meridian\",0],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH]]",
+  "crs_proj4": "+proj=eqc +lat_ts=18.4663 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +R=3396190 +units=m +no_defs=True",
+  "pixel_size_map_m": [
+   20.0,
+   20.0
+  ],
+  "nodata": -3.4028234663852886e+38,
+  "dtype": "float32"
+ },
+ "hirise": {
+  "file": "JEZ_hirise_soc_006_DTM_MOLAtopography_DeltaGeoid_1m_Eqc_latTs0_lon0_blend40.tif",
+  "bytes": 1839545409,
+  "crs_proj4": "+proj=eqc +lat_ts=0 +lat_0=0 +lon_0=0 +x_0=0 +y_0=0 +R=3396190 +units=m +no_defs=True",
+  "size_px": [
+   21400,
+   21488
+  ],
+  "pixel_size_map_m": [
+   1.0,
+   1.0
+  ],
+  "nodata": -3.4028226550889045e+38,
+  "rule": "Cells with >= 90% valid 1 m slopes use HiRISE: limiting slope = max(HiRISE p90 of 1 m slopes, CTX max 20 m slope); reported mean slope = HiRISE mean 1 m slope. Other cells use CTX only.",
+  "percentile": 90,
+  "min_valid_frac": 0.9,
+  "hist_bin_deg": 0.1,
+  "percentile_note": "p90 rather than max: a single 1 m pixel is dominated by DTM noise or one boulder. Heuristic, not a NASA standard.",
+  "alignment": "No resampling: HiRISE pixel centres mapped to CTX cells by x_ctx = x_hirise*cos(lat_ts_ctx), y_ctx = y_hirise (same sphere R, lon_0 = 0)."
+ }
+}

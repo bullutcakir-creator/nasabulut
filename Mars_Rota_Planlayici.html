@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mars Rota Planlayıcı</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* Palet */
+  --night:#080B18; --navy:#111A2E; --nebula:#7657E8; --mars:#E8754A; --star:#F4C95D; --ice:#7DD3FC; --white:#F1F5F9; --grey:#9AA6B2;
+  /* Roller */
+  --bg:var(--night); --surface:var(--navy); --surface-2:#16223A; --surface-3:#1E2B48;
+  --line:#25314F; --line-strong:#354470;
+  --text:var(--white); --muted:var(--grey); --faint:#8994A3;
+  --accent:var(--nebula); --accent-hi:#8A6FF0;
+  --sand:var(--star); --rust:var(--mars); --terra:var(--nebula);
+  --route:var(--mars); --start:var(--ice); --via:var(--nebula); --end:var(--mars); --focus:var(--star);
+  --ok:#6EE7A8; --warn:var(--star); --hard:var(--mars); --vhard:#FF6B81;
+  --c-krater:var(--star); --c-dag:var(--white); --c-inis:#A794FF; --c-su:var(--ice); --c-arastirma:#5EEAD4;
+  --radius:10px; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --left:320px; --right:330px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font-family:"IBM Plex Sans",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.45;overflow:hidden;
+  display:grid;grid-template-rows:56px 1fr 38px;grid-template-columns:minmax(0,1fr);}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.sr-only{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+svg.ic{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;gap:14px;padding:0 16px;background:linear-gradient(180deg,#151E32,#0D1427);border-bottom:1px solid var(--line);position:relative;z-index:30}
+.brand{display:flex;align-items:center;gap:11px;min-width:0}
+.logo{width:42px;height:42px;border-radius:12px;flex:none;background:linear-gradient(145deg,#241C4A,var(--navy));box-shadow:inset 0 0 0 1px #ffffff1b,0 6px 18px #0005;position:relative;overflow:hidden}
+.logo-orbit{position:absolute;width:54px;height:22px;left:-6px;top:10px;border:1px solid #7657E8dd;border-radius:50%;transform:rotate(-28deg)}
+.logo-planet{position:absolute;width:25px;height:25px;left:8px;top:8px;border-radius:50%;background:radial-gradient(circle at 33% 28%,#F5A27E,var(--mars) 54%,#6B2A12);box-shadow:0 0 14px #E8754A66}
+.logo-planet::before{content:"";position:absolute;width:5px;height:3px;left:6px;top:8px;border-radius:50%;background:#7F3B2A88;transform:rotate(-22deg)}
+.logo-star{position:absolute;right:7px;top:7px;width:4px;height:4px;border-radius:50%;background:var(--star);box-shadow:0 0 7px var(--star)}
+.brand-copy{min-width:0}
+.brand-kicker{display:block;font:9px var(--mono);color:var(--star);letter-spacing:1.15px;margin-bottom:1px}
+.brand h1{font-size:16px;font-weight:700;margin:0;letter-spacing:.15px;white-space:nowrap}
+.brand small{display:block;font-family:var(--mono);font-size:9px;color:var(--faint);letter-spacing:.65px;text-transform:uppercase}
+.brand-divider{height:32px;width:1px;background:var(--line-strong);margin:0 2px}
+.brand-mission{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.brand-mission .mission-mark{width:8px;height:8px;border-radius:50%;background:var(--mars);box-shadow:0 0 10px #E8754A88}
+.brand-mission b,.brand-mission small{display:block}
+.brand-mission b{font-size:10px;letter-spacing:.8px}
+.brand-mission small{font:9px var(--mono);color:var(--faint);margin-top:2px}
+.search{flex:1;max-width:460px;margin-left:auto;margin-right:auto;position:relative}
+.search input{width:100%;height:36px;border-radius:9px;border:1px solid var(--line);background:var(--surface);padding:0 12px 0 36px}
+.search input::placeholder{color:var(--faint)}
+.search > svg{position:absolute;left:11px;top:9px;color:var(--faint)}
+.search-results{position:absolute;top:42px;left:0;right:0;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:10px;padding:6px;list-style:none;margin:0;box-shadow:0 14px 40px #0009;max-height:320px;overflow:auto}
+.search-results li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;cursor:pointer}
+.search-results li[aria-selected="true"],.search-results li:hover{background:var(--surface-3)}
+.search-results .cat{font-size:11px;color:var(--ice);margin-left:auto;font-family:var(--mono)}
+.search-results .empty{color:var(--muted);cursor:default}
+.top-actions{display:flex;gap:6px;align-items:center}
+.icon-btn{width:36px;height:36px;display:inline-grid;place-items:center;border-radius:9px;border:1px solid transparent;background:transparent;color:var(--muted)}
+.icon-btn:hover{background:var(--surface-2);color:var(--text);border-color:var(--line)}
+.icon-btn[aria-expanded="true"]{background:var(--surface-3);color:var(--text)}
+.avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#3A2E78,#16203A);border:1px solid var(--line-strong);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--sand)}
+.mobile-only{display:none!important}
+.popover{position:absolute;right:12px;top:52px;width:250px;background:var(--surface-2);border:1px solid var(--line-strong);border-radius:12px;padding:14px;box-shadow:0 14px 40px #0009;z-index:40}
+.popover p{margin:4px 0 0;color:var(--muted);font-size:13px}
+
+/* ---------- layout ---------- */
+.main{display:grid;grid-template-columns:var(--left) 1fr var(--right);min-height:0;position:relative}
+.panel{background:var(--surface);overflow-y:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--line-strong) transparent}
+.panel.left{border-right:1px solid var(--line)}
+.panel.right{border-left:1px solid var(--line)}
+.section{padding:16px;border-bottom:1px solid var(--line)}
+.section:last-child{border-bottom:0}
+.section-h{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}
+.section-h h2{font-size:11.5px;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+.field{width:100%;height:38px;border-radius:9px;border:1px solid var(--line);background:var(--bg);padding:0 12px}
+.field:hover{border-color:var(--line-strong)}
+select.field{appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 17px) 16px,calc(100% - 12px) 16px;background-size:5px 5px;background-repeat:no-repeat;padding-right:32px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:9px;border:1px solid var(--line-strong);background:var(--surface-2);font-weight:500;white-space:nowrap}
+.btn:hover{background:var(--surface-3);border-color:var(--line-strong)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.btn.primary:hover{background:var(--accent-hi);border-color:var(--accent-hi)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.btn.ghost:hover{background:var(--surface-2);color:var(--text)}
+.btn.sm{height:30px;padding:0 10px;font-size:13px;border-radius:8px}
+.btn.block{width:100%}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+
+/* route endpoints */
+.endpoint{display:flex;align-items:center;gap:10px;width:100%;min-height:46px;padding:8px 10px;border-radius:10px;border:1px dashed var(--line-strong);background:transparent;text-align:left}
+.endpoint:hover{border-color:var(--line-strong);background:var(--surface-2)}
+.endpoint.filled{border-style:solid;background:var(--surface-2)}
+.endpoint.armed{border-color:var(--accent);border-style:solid;box-shadow:0 0 0 3px #7657E840}
+.dot{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:600 12px var(--mono);flex:none;color:#08130e}
+.endpoint .ep-text{min-width:0;flex:1}
+.endpoint .ep-title{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.endpoint .ep-sub{display:block;font:12px var(--mono);color:var(--muted)}
+.endpoint.placeholder .ep-title{color:var(--sand)}
+.dot.start{background:var(--start)}
+.dot.end{background:var(--end)}
+.dot.via{background:var(--via);color:#fff}
+.stops{list-style:none;margin:8px 0;padding:0 0 0 12px;border-left:2px solid var(--line);margin-left:22px}
+.stop-item{display:flex;align-items:center;gap:8px;padding:6px 6px 6px 8px;border-radius:9px;margin-bottom:4px;border:1px solid transparent}
+.stop-item:hover{background:var(--surface-2)}
+.stop-item.selected{background:var(--surface-3);border-color:var(--accent)}
+.stop-item .dot{width:22px;height:22px;font-size:11px}
+.stop-item .si-main{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0}
+.stop-item .si-name{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:13.5px}
+.stop-item .si-sub{display:block;font:11.5px var(--mono);color:var(--muted)}
+.stop-item .icon-btn{width:28px;height:28px}
+.stop-item .icon-btn svg{width:15px;height:15px}
+.stops-empty{font-size:12.5px;color:var(--faint);padding:6px 0}
+.mode-group{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px}
+.mode-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:9px 4px;border-radius:9px;border:1px solid var(--line);background:var(--bg);font-size:11.5px;color:var(--muted);line-height:1.2;text-align:center}
+.mode-btn:hover{border-color:var(--line-strong);color:var(--text)}
+.mode-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--text);background:#7657E826}
+.mode-btn .swatch{width:10px;height:10px;border-radius:50%}
+.empty-card{border:1px dashed var(--line-strong);border-radius:12px;padding:18px 16px;text-align:center;background:repeating-linear-gradient(135deg,#ffffff03 0 8px,transparent 8px 16px)}
+.empty-card .em-ic{width:44px;height:44px;margin:0 auto 10px;border-radius:50%;display:grid;place-items:center;background:var(--surface-3);color:var(--sand)}
+.empty-card h3{margin:0 0 4px;font-size:14.5px}
+.empty-card p{margin:0 0 12px;color:var(--muted);font-size:13px}
+.strategy-list{display:grid;gap:7px}
+.strategy-card{display:grid;grid-template-columns:30px 1fr auto;align-items:center;gap:9px;width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:var(--bg);text-align:left;color:var(--text);transition:background .15s,border-color .15s}
+.strategy-card[aria-current="true"]{border-color:var(--accent);background:#7657E81f;box-shadow:inset 0 0 0 1px #7657E838}
+.strategy-icon{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;background:var(--surface-3);color:var(--ice)}
+.strategy-icon svg{width:16px;height:16px}
+.strategy-copy{min-width:0}
+.strategy-copy b{display:block;font-size:13px}
+.strategy-copy small{display:block;margin-top:2px;font-size:11px;line-height:1.35;color:var(--muted)}
+.strategy-result{display:block;margin-top:4px;font:10px var(--mono);color:var(--ice)}
+.strategy-action{font-size:10px;color:var(--faint);white-space:nowrap}
+.strategy-card[aria-current="true"] .strategy-action{color:var(--star)}
+.strategy-note{margin:9px 0 0;font-size:11px;line-height:1.45;color:var(--faint)}
+
+/* filters */
+.switch{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;font-size:13.5px}
+.switch input{appearance:none;width:36px;height:20px;border-radius:20px;background:var(--line-strong);position:relative;cursor:pointer;flex:none;transition:background .15s}
+.switch input::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--white);transition:transform .15s}
+.switch input:checked{background:var(--terra)}
+.switch input:checked::after{transform:translateX(16px)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border-radius:30px;border:1px solid var(--line);background:var(--bg);font-size:12.5px;color:var(--muted)}
+.chip svg{width:14px;height:14px}
+.chip[aria-pressed="true"]{color:var(--text);border-color:currentColor}
+.chip[aria-pressed="true"] .cnt{opacity:.8}
+.chip .cnt{font:11px var(--mono);color:var(--faint)}
+.chip:disabled{opacity:.4}
+.saved{list-style:none;padding:0;margin:10px 0 0}
+.saved li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:9px;background:var(--surface-2);margin-bottom:6px}
+.saved .sv-main{flex:1;min-width:0}
+.saved .sv-name{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.saved .sv-sub{font:11.5px var(--mono);color:var(--muted)}
+.inline-row{display:flex;gap:8px;align-items:flex-end}
+.inline-row > *{flex:1}
+.hint-text{font-size:12px;color:var(--faint);margin:8px 0 0}
+
+/* ---------- map ---------- */
+.map{position:relative;overflow:hidden;background:#05070F;touch-action:none;outline:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.map.panning{cursor:grabbing}
+.map.armed{cursor:crosshair}
+.map:focus-visible{box-shadow:inset 0 0 0 2px var(--focus)}
+#terrain{position:absolute;left:0;top:0;transform-origin:0 0;width:3600px;height:1800px;will-change:transform}
+#overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#markers{position:absolute;inset:0;pointer-events:none}
+#markers > *{pointer-events:auto;position:absolute;left:0;top:0}
+.grid-line{stroke:#ffffff22;stroke-width:.12}
+.grid-label{fill:#ffffffa0;font:10.5px var(--mono);paint-order:stroke;stroke:#000a;stroke-width:3px}
+.route-casing{fill:none;stroke:#080B18;stroke-width:2.8;stroke-linejoin:round;stroke-linecap:round;opacity:.85}
+.route-line{fill:none;stroke:var(--route);stroke-width:1.15;stroke-linejoin:round;stroke-linecap:round}
+.route-flow{fill:none;stroke:#ffffff;stroke-width:.35;stroke-dasharray:1 4;stroke-linecap:round;animation:flow 1.2s linear infinite;opacity:.9}
+@keyframes flow{to{stroke-dashoffset:-16}}
+.leg-label{font:600 11px var(--mono);fill:#FFF1EA;paint-order:stroke;stroke:#05080f;stroke-width:4px}
+@media (prefers-reduced-motion:reduce){.route-flow{animation:none}}
+
+.poi{width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;border:1.5px solid currentColor;background:#080B18dd;display:grid;place-items:center;padding:0;box-shadow:0 2px 8px #0008}
+.poi svg{width:15px;height:15px}
+.poi:hover,.poi.selected{background:currentColor}
+.poi:hover svg,.poi.selected svg{color:#080B18}
+.poi.selected{box-shadow:0 0 0 4px #080B18,0 0 0 6px currentColor}
+.poi .poi-label{position:absolute;left:32px;top:50%;transform:translateY(-50%);white-space:nowrap;font-size:12px;font-weight:500;color:var(--text);background:#080B18d9;border:1px solid #ffffff1a;padding:2px 7px;border-radius:6px;pointer-events:none;opacity:0;transition:opacity .12s}
+.map.show-labels .poi .poi-label.lod,.poi:hover .poi-label,.poi:focus-visible .poi-label,.poi.selected .poi-label{opacity:1}
+.cat-krater{color:var(--c-krater)} .cat-dag{color:var(--c-dag)} .cat-inis{color:var(--c-inis)} .cat-su{color:var(--c-su)} .cat-arastirma{color:var(--c-arastirma)}
+.stop-mk{width:30px;height:30px;margin:-15px 0 0 -15px;border-radius:50%;border:2.5px solid #05080f;display:grid;place-items:center;font:700 13px var(--mono);color:#05080f;padding:0;box-shadow:0 0 0 2px #ffffffcc,0 4px 10px #000a;cursor:grab;touch-action:none}
+.stop-mk.start{background:var(--start)} .stop-mk.via{background:var(--via);color:#fff} .stop-mk.end{background:var(--end)}
+.stop-mk.selected{box-shadow:0 0 0 3px #fff,0 0 0 7px #ffffff40,0 4px 12px #000;transform:scale(1.12)}
+.stop-mk.dragging{cursor:grabbing;transform:scale(1.2)}
+.region-card{margin:0;padding:6px 10px 6px 9px;border-radius:8px;border:1px solid #ffffff26;border-left:3px solid var(--sand);background:#080B18c7;backdrop-filter:blur(3px);text-align:left;transform:translate(-50%,-50%);max-width:190px;box-shadow:0 4px 14px #0007}
+.region-card b{display:block;font-size:12.5px;font-weight:600;letter-spacing:.2px}
+.region-card span{display:block;font-size:11px;color:var(--muted)}
+.region-card:hover,.region-card.selected{border-color:var(--sand);background:#16223Aee}
+.map:not(.show-labels) .region-card{display:none}
+.map:not(.show-pois) .poi{display:none}
+
+.map-ui{position:absolute;z-index:5}
+.zoom-ctl{right:14px;top:14px;display:flex;flex-direction:column;background:#111A2Eee;border:1px solid var(--line-strong);border-radius:10px;overflow:hidden;box-shadow:0 6px 18px #0008}
+.zoom-ctl button{width:38px;height:38px;border:0;background:transparent;color:var(--text);display:grid;place-items:center}
+.zoom-ctl button+button{border-top:1px solid var(--line)}
+.zoom-ctl button:hover{background:var(--surface-3)}
+.map-hint{left:50%;top:62px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;background:#111A2Ef0;border:1px solid var(--line-strong);border-radius:30px;padding:7px 8px 7px 14px;box-shadow:0 8px 24px #000a;font-size:13px;max-width:calc(100% - 90px)}
+.map-hint .pulse{width:8px;height:8px;border-radius:50%;background:var(--focus);box-shadow:0 0 0 0 #F4C95Daa;animation:pulse 1.8s infinite;flex:none}
+@keyframes pulse{70%{box-shadow:0 0 0 9px #F4C95D00}100%{box-shadow:0 0 0 0 #F4C95D00}}
+.map-hint .icon-btn{width:26px;height:26px}
+.map-hint kbd{font:11px var(--mono);border:1px solid var(--line-strong);border-radius:4px;padding:0 4px;color:var(--muted)}
+.map-controls{left:14px;top:14px;display:flex;align-items:center;gap:10px;padding:4px 8px;background:#111A2Ef0;border:1px solid var(--line-strong);border-radius:10px;box-shadow:0 6px 18px #0008}
+.map-controls .control-title{font-size:11px;color:var(--muted)}
+.map-controls .seg{background:var(--bg)}
+.map-controls .seg button{height:30px}
+.map-controls .toggle-mini{font:12px "IBM Plex Sans",system-ui,sans-serif;color:var(--text);gap:4px}
+.map-controls .toggle-mini input{margin:0}
+.crosshair{left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;pointer-events:none;display:none}
+.map.kb .crosshair{display:block}
+.crosshair::before,.crosshair::after{content:"";position:absolute;background:var(--focus)}
+.crosshair::before{left:12px;top:0;width:2px;height:26px}
+.crosshair::after{top:12px;left:0;height:2px;width:26px}
+.disclaimer{left:14px;bottom:12px;font-size:11px;color:#ffffffb8;background:#05080fb0;border-radius:6px;padding:3px 8px;font-family:var(--mono)}
+.summary-chip{display:none}
+
+.state{position:absolute;inset:0;z-index:8;display:grid;place-items:center;background:radial-gradient(ellipse at center,#18173A,#05070F 70%)}
+.state[hidden]{display:none}
+.state-box{text-align:center;max-width:360px;padding:24px}
+.state-box h2{font-size:17px;margin:14px 0 6px}
+.state-box p{color:var(--muted);margin:0 0 16px}
+.globe{width:74px;height:74px;margin:0 auto;border-radius:50%;background:radial-gradient(circle at 35% 30%,#F5A27E,#E8754A 55%,#5A220E);position:relative;box-shadow:0 0 40px #7657E855}
+.globe.spin::after{content:"";position:absolute;inset:-10px;border-radius:50%;border:2px solid transparent;border-top-color:var(--ice);animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.globe.err{filter:grayscale(.6) brightness(.7)}
+.globe.err::after{content:"!";position:absolute;right:-6px;bottom:-4px;width:26px;height:26px;border-radius:50%;background:var(--vhard);color:#1a0508;font-weight:700;display:grid;place-items:center}
+.progress{height:6px;border-radius:6px;background:var(--surface-3);overflow:hidden;width:240px;margin:0 auto}
+.progress i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--nebula),var(--mars));transition:width .15s}
+.state-box .mono{font:12px var(--mono);color:var(--faint);margin-top:8px}
+
+/* ---------- right panel ---------- */
+.info-card{border:1px solid var(--line);border-radius:12px;background:var(--surface-2);overflow:hidden}
+.info-head{padding:14px 14px 12px;border-bottom:1px solid var(--line);position:relative}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;padding:3px 8px;border-radius:20px;border:1px solid currentColor}
+.badge svg{width:13px;height:13px}
+.info-head h3{margin:8px 0 2px;font-size:17px}
+.info-head .coords{font:12px var(--mono);color:var(--ice)}
+.info-head .close{position:absolute;right:8px;top:8px}
+.info-body{padding:12px 14px 14px}
+.info-body p{margin:0 0 12px;color:var(--text);font-size:13.5px}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;margin:0 0 14px;font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;text-align:right;font-family:var(--mono);font-size:12.5px}
+.sample-note{font-size:11px;color:var(--faint);font-family:var(--mono);margin:-4px 0 12px}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.metric{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.metric.wide{grid-column:1/-1}
+.metric .m-label{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.metric .m-value{font:500 20px var(--mono);margin-top:2px;letter-spacing:-.3px}
+.metric .m-value small{font-size:12px;color:var(--muted);margin-left:3px}
+.metric .m-sub{font-size:11.5px;color:var(--faint)}
+.diff-bar{height:8px;border-radius:8px;background:linear-gradient(90deg,var(--ok),var(--warn),var(--hard),var(--vhard));position:relative;margin:10px 0 4px}
+.diff-bar i{position:absolute;top:-4px;width:4px;height:16px;border-radius:3px;background:#fff;box-shadow:0 0 0 2px #05080f;transform:translateX(-50%);transition:left .25s}
+.diff-scale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--faint);font-family:var(--mono)}
+.diff-tag{display:inline-block;padding:1px 8px;border-radius:20px;font-size:12px;font-weight:600;color:#080B18}
+.profile{margin-top:14px}
+.profile svg{width:100%;height:110px;display:block}
+.legs{list-style:none;margin:12px 0 0;padding:0;font-size:12.5px}
+.legs li{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.legs .lg-n{font-family:var(--mono);color:var(--muted);min-width:44px}
+.legs .lg-d{margin-left:auto;font-family:var(--mono)}
+.legs .pip{width:8px;height:8px;border-radius:50%}
+.summary-empty{color:var(--muted);font-size:13px}
+.route-reason{margin-top:14px;padding:13px;border:1px solid #7657E855;border-radius:11px;background:linear-gradient(135deg,#7657E81a,var(--surface-2) 72%)}
+.route-reason h3{display:flex;align-items:center;gap:7px;margin:0 0 7px;font-size:13px}
+.route-reason h3 svg{width:16px;height:16px;color:var(--nebula)}
+.route-reason p{margin:0;font-size:12.5px;line-height:1.55;color:var(--text)}
+.route-reason small{display:block;margin-top:8px;color:var(--faint);font-size:10.5px;line-height:1.4}
+
+/* ---------- bottom bar ---------- */
+.bottombar{display:flex;align-items:center;gap:18px;padding:0 14px;background:#0C1222;border-top:1px solid var(--line);font:12px var(--mono);color:var(--muted);white-space:nowrap;overflow:hidden}
+.bottombar .bb-item{display:flex;align-items:center;gap:8px}
+.bottombar b{color:var(--ice);font-weight:500}
+.scalebar{display:flex;flex-direction:column;gap:2px}
+.scalebar i{display:block;height:6px;border:1.5px solid var(--ice);border-top:0}
+.scalebar span{font-size:10.5px;line-height:1}
+.seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:7px;overflow:hidden}
+.seg button{height:26px;padding:0 9px;border:0;background:transparent;font:12px var(--mono);color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--surface-3);color:var(--text)}
+.seg button+button{border-left:1px solid var(--line-strong)}
+.bb-spacer{flex:1}
+.toggle-mini{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.toggle-mini input{accent-color:var(--terra);width:14px;height:14px}
+
+/* ---------- dialogs / toast ---------- */
+dialog{border:1px solid var(--line-strong);border-radius:16px;background:var(--surface);color:var(--text);padding:0;max-width:min(560px,calc(100vw - 24px));width:100%;box-shadow:0 30px 80px #000c}
+dialog::backdrop{background:#03050bcc;backdrop-filter:blur(3px)}
+.dlg-head{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--line)}
+.dlg-head h2{margin:0;font-size:17px}
+.dlg-body{padding:18px}
+.dlg-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--line);flex-wrap:wrap}
+.steps{display:grid;gap:10px;margin:0;padding:0;list-style:none;counter-reset:s}
+.steps li{display:flex;gap:12px;align-items:flex-start;padding:12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--line)}
+.steps li::before{counter-increment:s;content:counter(s);flex:none;width:26px;height:26px;border-radius:50%;background:var(--accent);color:#fff;font:700 13px var(--mono);display:grid;place-items:center}
+.steps b{display:block;margin-bottom:2px}
+.steps span{color:var(--muted);font-size:13px}
+.shortcuts{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px;margin-top:14px}
+.shortcuts kbd{font:12px var(--mono);border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:5px;padding:1px 6px;background:var(--surface-2);white-space:nowrap}
+.tabs{display:flex;gap:6px;margin-bottom:12px}
+.tabs button{height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--muted);font-weight:500}
+.tabs button[aria-selected="true"]{border-color:var(--terra);color:var(--text);background:#7657E826}
+.export-pre{width:100%;height:220px;resize:vertical;border-radius:10px;border:1px solid var(--line);background:#060914;color:#D6ECFA;font:12px/1.5 var(--mono);padding:12px}
+.export-meta{display:flex;gap:16px;font:12px var(--mono);color:var(--muted);margin-bottom:12px;flex-wrap:wrap}
+.toasts{position:fixed;left:50%;bottom:52px;transform:translateX(-50%);display:flex;flex-direction:column;gap:8px;z-index:100;pointer-events:none;align-items:center}
+.toast{pointer-events:auto;display:flex;align-items:center;gap:10px;background:var(--surface-3);border:1px solid var(--line-strong);border-left:4px solid var(--ice);padding:9px 12px;border-radius:10px;box-shadow:0 10px 30px #000b;font-size:13.5px;animation:tin .2s ease-out}
+.toast.error{border-left-color:var(--vhard)}
+.toast.ok{border-left-color:var(--ok)}
+.toast .btn{height:28px}
+@keyframes tin{from{opacity:0;transform:translateY(8px)}}
+.backdrop{display:none}
+
+/* ---------- responsive ---------- */
+@media (max-width:1180px){:root{--left:290px;--right:300px}}
+@media (max-width:980px){
+  body{grid-template-rows:64px 1fr 34px}
+  .main{grid-template-columns:minmax(0,1fr)}
+  .panel{position:absolute;top:0;bottom:0;width:min(360px,88vw);z-index:20;transition:transform .22s ease;box-shadow:0 0 40px #000c}
+  .panel.left{left:0;transform:translateX(-102%)}
+  .panel.right{right:0;transform:translateX(102%)}
+  body.open-left .panel.left,body.open-right .panel.right{transform:none}
+  .backdrop{display:block;position:absolute;inset:0;background:#03050b99;z-index:15;opacity:0;pointer-events:none;transition:opacity .2s}
+  body.open-left .backdrop,body.open-right .backdrop{opacity:1;pointer-events:auto}
+  .mobile-only{display:inline-grid!important}
+  .desk-only{display:none!important}
+  .brand small,.brand-kicker,.brand-divider,.brand-mission{display:none}
+  .brand h1{font-size:15px}
+  .summary-chip{display:flex;position:absolute;left:50%;bottom:14px;transform:translateX(-50%);z-index:5;align-items:center;gap:10px;background:#111A2Ef2;border:1px solid var(--line-strong);border-radius:30px;padding:8px 14px;font:12.5px var(--mono);box-shadow:0 8px 24px #000a;white-space:nowrap}
+  .disclaimer{bottom:62px}
+  .map-hint{left:12px;right:62px;top:58px;transform:none;max-width:none;font-size:12.5px;border-radius:14px}
+  .zoom-ctl{right:10px;top:12px}
+}
+@media (max-width:640px){
+  body{grid-template-rows:56px 1fr 34px}
+  .brand h1{font-size:14px}
+  .brand{gap:7px}
+  .logo{width:32px;height:32px;border-radius:10px}
+  .logo-orbit{width:42px;height:17px;left:-5px;top:8px}
+  .logo-planet{width:20px;height:20px;left:6px;top:6px}
+  .logo-planet::before{width:4px;height:2px;left:5px;top:6px}
+  .logo-star{right:5px;top:5px;width:3px;height:3px}
+  .topbar{gap:6px;padding:0 8px}
+  .top-actions{gap:2px;margin-left:auto}
+  #helpBtn{display:none}
+  .logo{width:26px;height:26px}
+  .search{position:absolute;left:10px;right:10px;top:62px;display:none;max-width:none}
+  body.search-open .search{display:block}
+  .search input{box-shadow:0 10px 30px #000b}
+  .bottombar{gap:12px}
+  .bottombar .hide-sm{display:none}
+  .bottombar .bb-item:first-child{display:none}
+  .bb-spacer{display:none}
+  .bottombar{justify-content:space-between;padding:0 10px}
+  .seg button{padding:0 7px}
+  .zoom-ctl button{width:36px;height:36px}
+  .map-controls{left:8px;top:10px;gap:6px;padding:4px 6px}
+  .map-controls .control-title{display:none}
+  .map-controls .toggle-mini{font-size:11px;gap:3px}
+  .map-controls .toggle-mini input{width:12px;height:12px}
+}
+
+/* ---------- sadeleştirilmiş arayüz ---------- */
+:root{
+  /* Palet: Gece uzayı, Koyu lacivert, Nebula moru, Mars turuncusu, Yıldız sarısı, Buz mavisi, Yıldız beyazı, Soluk gri */
+  --night:#080B18; --navy:#111A2E; --nebula:#7657E8; --mars:#E8754A; --star:#F4C95D; --ice:#7DD3FC; --white:#F1F5F9; --grey:#9AA6B2;
+  --bg:var(--night); --surface:var(--navy); --surface-2:#16223A; --surface-3:#1E2B48;
+  --line:#25314F; --line-strong:#354470;
+  --text:var(--white); --muted:var(--grey); --faint:#8994A3;
+  --accent:var(--nebula); --accent-hi:#8A6FF0;
+  --sand:var(--star); --rust:var(--mars); --terra:var(--nebula);
+  --route:var(--mars); --start:var(--ice); --via:var(--nebula); --end:var(--mars); --focus:var(--star);
+  --left:300px; --right:290px;
+}
+.topbar{background:var(--surface);gap:12px}
+.logo{box-shadow:0 0 0 1px #ffffff1a}
+.logo::after{display:none}
+.panel{background:var(--surface)}
+.section{padding:14px}
+.section-h h2{letter-spacing:.7px}
+.field,.search input{background:var(--bg);border-color:var(--line)}
+.btn,.mode-btn{border-color:var(--line);background:var(--surface-2)}
+.btn:hover,.mode-btn:hover{background:var(--surface-3);border-color:var(--line-strong)}
+.btn.primary{background:var(--accent);border-color:var(--accent)}
+.endpoint.filled{background:var(--surface-2)}
+.empty-card{background:var(--surface-2)}
+.saved li,.metric{background:var(--surface-2)}
+.info-card{background:var(--surface-2)}
+.bottombar{background:var(--surface);border-color:var(--line)}
+.zoom-ctl{background:var(--surface);border-color:var(--line)}
+.map-hint{box-shadow:0 4px 14px #0008}
+.advanced-settings{border:1px solid var(--line);border-radius:10px;background:var(--surface-2)}
+.advanced-settings summary{padding:10px 12px;color:var(--text);font-size:13px;font-weight:500;cursor:pointer;list-style:none}
+.advanced-settings summary::-webkit-details-marker{display:none}
+.advanced-settings summary::after{content:"+";float:right;color:var(--muted);font:16px var(--mono);line-height:1}
+.advanced-settings[open] summary::after{content:"−"}
+.advanced-body{padding:0 12px 12px}
+.advanced-body .hint-text{margin-bottom:0}
+@media (max-width:1180px){:root{--left:290px;--right:280px}}
+#terrain{width:100%;height:100%;transform-origin:0 0;object-fit:fill;image-rendering:auto}
+#overlay{pointer-events:none}
+#mapWorld{position:absolute;transform-origin:0 0;overflow:hidden}
+#mapWorld #terrain,#mapWorld #overlay{position:absolute;inset:0;width:100%;height:100%;transform:none}
+.map-controls [data-view="natural"]::after{content:""}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.8"/><path d="M12 17.2h.01"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+    <symbol id="i-fit" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 14 6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 10 6 6 6-6"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></symbol>
+    <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M5 13v7h14v-7"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h9"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h10"/></symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H16a3.5 3.5 0 0 0 0-7H8a3.5 3.5 0 0 1 0-7h7.5"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 20 6v5c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V6z"/><path d="m8.5 12 2.2 2.2 4.8-5"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 3 5 14h6l-1 7 8-11h-6z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-ruler" viewBox="0 0 24 24"><path d="M3 17 17 3l4 4L7 21z"/><path d="m7 13 2 2M10 10l2 2M13 7l2 2"/></symbol>
+    <symbol id="i-mtn" viewBox="0 0 24 24"><path d="m3 20 7-12 4 6 2-3 5 9z"/></symbol>
+    <symbol id="i-stops" viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></symbol>
+    <symbol id="i-krater" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><ellipse cx="12" cy="13.5" rx="4.5" ry="3"/></symbol>
+    <symbol id="i-dag" viewBox="0 0 24 24"><path d="m2.5 19 7-12 3.5 5.5L15.5 9l6 10z"/></symbol>
+    <symbol id="i-inis" viewBox="0 0 24 24"><path d="M4 10a8 8 0 0 1 16 0z"/><path d="M5 10l7 8 7-8M12 10v8"/></symbol>
+    <symbol id="i-su" viewBox="0 0 24 24"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></symbol>
+    <symbol id="i-arastirma" viewBox="0 0 24 24"><path d="M12 2.8 20 7.4v9.2l-8 4.6-8-4.6V7.4z"/><circle cx="12" cy="12" r="2.6"/></symbol>
+    <symbol id="i-region" viewBox="0 0 24 24"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></symbol>
+  </defs>
+</svg>
+
+<header class="topbar">
+  <button class="icon-btn mobile-only" id="openLeft" aria-label="Rota panelini aç" aria-controls="leftPanel" aria-expanded="false"><svg class="ic"><use href="#i-menu"/></svg></button>
+  <div class="brand">
+    <div class="logo" aria-hidden="true"><span class="logo-orbit"></span><span class="logo-planet"></span><span class="logo-star"></span></div>
+    <div class="brand-copy"><span class="brand-kicker">GÖREV KONTROLÜ · MARS 01</span><h1>Mars Rota Planlayıcı</h1><small>YÜZEY KEŞFİ · GÜZERGÂH ANALİZİ</small></div>
+    <span class="brand-divider" aria-hidden="true"></span>
+    <div class="brand-mission"><span class="mission-mark" aria-hidden="true"></span><div><b>KEŞİF MASASI</b><small>ROBOTİK GÖREV PLANLAMA</small></div></div>
+  </div>
+  <div class="search" role="search">
+    <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+    <label for="searchInput" class="sr-only">Bölge ara</label>
+    <input id="searchInput" type="search" placeholder="Bölge veya rota noktası ara…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="searchResults" aria-autocomplete="list">
+    <ul id="searchResults" class="search-results" role="listbox" hidden></ul>
+  </div>
+  <div class="top-actions">
+    <button class="icon-btn mobile-only" id="searchToggle" aria-label="Aramayı aç"><svg class="ic"><use href="#i-search"/></svg></button>
+    <button class="icon-btn" id="helpBtn" aria-label="Yardım ve kısayollar"><svg class="ic"><use href="#i-help"/></svg></button>
+    <button class="icon-btn" id="profileBtn" aria-label="Profil" aria-expanded="false" aria-haspopup="true"><span class="avatar" aria-hidden="true">MK</span></button>
+    <button class="icon-btn mobile-only" id="openRight" aria-label="Rota özetini aç" aria-controls="rightPanel" aria-expanded="false"><svg class="ic"><use href="#i-chart"/></svg></button>
+  </div>
+  <div class="popover" id="profilePop" hidden>
+    <strong>Misafir Kâşif</strong>
+    <p>Hesap bağlı değil. Kaydedilen rotalar yalnızca bu tarayıcıda tutulur.</p>
+    <div class="btn-row" style="margin-top:12px"><button class="btn sm" id="popSaved">Kayıtlı rotalar</button><button class="btn sm ghost" id="popHelp">Turu göster</button></div>
+  </div>
+</header>
+
+<div class="main">
+  <!-- LEFT PANEL -->
+  <aside class="panel left" id="leftPanel" aria-label="Rota paneli">
+    <div class="section" aria-labelledby="hStrategy">
+      <div class="section-h"><h2 id="hStrategy">Rota yaklaşımı</h2></div>
+      <div class="strategy-list" id="strategyOptions">
+        <div class="strategy-card" aria-current="true">
+          <span class="strategy-icon"><svg class="ic"><use href="#i-shield"/></svg></span>
+          <span class="strategy-copy"><b>Güvenli rota</b><small>Dik ve bilinmeyen hücrelerden, ayrıca arazi çöküntülerinden kaçınır.</small><span class="strategy-result"></span></span>
+          <span class="strategy-action">Etkin</span>
+        </div>
+      </div>
+      <p class="strategy-note">Başlangıç ve varış noktalarını belirlediğinizde rota bu güvenli arazi ölçütüne göre oluşturulur.</p>
+    </div>
+    <div class="section">
+      <label class="label" for="routeName">Rota adı</label>
+      <input class="field" id="routeName" placeholder="Örn. Jezero – Isidis keşfi" maxlength="60">
+    </div>
+
+    <div class="section" aria-labelledby="hPoints">
+      <div class="section-h">
+        <h2 id="hPoints">Rota noktaları</h2>
+        <div class="btn-row">
+          <button class="icon-btn" id="undoBtn" aria-label="Geri al (Ctrl+Z)" title="Geri al" disabled><svg class="ic"><use href="#i-undo"/></svg></button>
+          <button class="icon-btn" id="reverseBtn" aria-label="Rotayı ters çevir" title="Ters çevir"><svg class="ic"><use href="#i-swap"/></svg></button>
+          <button class="icon-btn" id="clearBtn" aria-label="Rotayı temizle" title="Temizle"><svg class="ic"><use href="#i-trash"/></svg></button>
+        </div>
+      </div>
+      <div id="pointsArea"></div>
+      <div class="mode-group" role="group" aria-label="Haritaya tıklayınca eklenecek nokta türü">
+        <button class="mode-btn" data-mode="start" aria-pressed="false"><span class="swatch" style="background:var(--start)"></span>Başlangıç noktası seç</button>
+        <button class="mode-btn" data-mode="end" aria-pressed="false"><span class="swatch" style="background:var(--end)"></span>Varış noktası ekle</button>
+      </div>
+      <p class="hint-text">İki nokta seçtiğinizde güvenli rota hesaplanır. Yeni tıklama varış noktasını değiştirir.</p>
+    </div>
+
+    <div class="section" aria-labelledby="hSet">
+      <div class="section-h"><h2 id="hSet">Rota ayarları</h2></div>
+      <details class="advanced-settings">
+        <summary>Arazi motoru ve veri</summary>
+        <div class="advanced-body">
+          <p class="hint-text">Express Dijkstra · CTX 20 m DEM + HiRISE türetilmiş eğim · 20° geçilebilirlik sınırı · güvenlik tamponu etkin.</p>
+          <p class="hint-text">Çalışma alanı: Jezero bölgesi, yaklaşık 58 × 58 km. Hava ve toprak dayanımı verisi kullanılmaz.</p>
+        </div>
+      </details>
+    </div>
+
+    <div class="section" aria-labelledby="hSave">
+      <div class="section-h"><h2 id="hSave">Kaydet ve paylaş</h2></div>
+      <div class="btn-row">
+        <button class="btn primary" id="saveBtn" style="flex:1"><svg class="ic"><use href="#i-save"/></svg>Rotayı kaydet</button>
+        <button class="btn" id="exportBtn" style="flex:1"><svg class="ic"><use href="#i-export"/></svg>Dışa aktar</button>
+      </div>
+      <ul class="saved" id="savedList" aria-label="Kayıtlı rotalar"></ul>
+    </div>
+  </aside>
+
+  <!-- MAP -->
+  <section class="map show-labels show-pois" id="map" tabindex="0" aria-label="Etkileşimli Mars haritası. Ok tuşlarıyla kaydırın, artı ve eksi ile yakınlaştırın, Enter ile merkeze nokta ekleyin." aria-describedby="mapHintText">
+    <div id="mapWorld">
+    <canvas id="terrain" width="1800" height="900" aria-hidden="true"></canvas>
+    <svg id="overlay" aria-hidden="true"><g id="gridG"></g><g id="routeG"></g></svg>
+    <div id="markers"></div>
+    </div>
+    <div class="map-ui map-controls" role="group" aria-label="Harita kontrolleri">
+      <span class="control-title">Görünüm</span>
+      <div class="seg" role="group" aria-label="Harita gösterimi">
+        <button data-view="natural" aria-pressed="true">Doğal</button><button data-view="elev" aria-pressed="false">Yükselti</button>
+      </div>
+      <label class="toggle-mini"><input type="checkbox" id="gridToggle" checked> Izgara</label>
+      <label class="toggle-mini"><input type="checkbox" id="labelToggle" checked> Etiketler</label>
+    </div>
+    <div class="map-ui crosshair" aria-hidden="true"></div>
+    <div class="map-ui map-hint" id="mapHint" role="status"><span class="pulse" aria-hidden="true"></span><span id="mapHintText">Başlangıç noktası seçmek için haritaya tıklayın</span><button class="icon-btn" id="hintClose" aria-label="İpucunu gizle"><svg class="ic"><use href="#i-x"/></svg></button></div>
+    <div class="map-ui zoom-ctl">
+      <button id="zoomIn" aria-label="Yakınlaştır"><svg class="ic"><use href="#i-plus"/></svg></button>
+      <button id="zoomOut" aria-label="Uzaklaştır"><svg class="ic"><use href="#i-minus"/></svg></button>
+      <button id="zoomFit" aria-label="Tüm haritayı göster"><svg class="ic"><use href="#i-fit"/></svg></button>
+      <button id="zoomRoute" aria-label="Rotaya odaklan"><svg class="ic"><use href="#i-route"/></svg></button>
+    </div>
+    <div class="map-ui disclaimer">Jezero · CTX 20 m + HiRISE eğim · kırmızı: geçilemez alan/tampon</div>
+    <button class="map-ui summary-chip" id="summaryChip" aria-label="Rota özetini aç"></button>
+
+    <div class="state" id="loadingState" role="status" aria-live="polite">
+      <div class="state-box">
+        <div class="globe spin" aria-hidden="true"></div>
+        <h2>Arazi verisi yükleniyor</h2>
+        <p>Jezero bölgesinin yükseklik ve eğim katmanları Express sunucusundan alınıyor.</p>
+        <div class="progress"><i id="progressBar"></i></div>
+        <div class="mono" id="progressText">%0</div>
+      </div>
+    </div>
+    <div class="state" id="errorState" role="alert" hidden>
+      <div class="state-box">
+        <div class="globe err" aria-hidden="true"></div>
+        <h2>Harita yüklenemedi</h2>
+        <p id="errorMsg">Yüzey modeli oluşturulurken bir sorun oluştu. Rotanız etkilenmedi.</p>
+        <button class="btn primary" id="retryBtn">Tekrar dene</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT PANEL -->
+  <aside class="panel right" id="rightPanel" aria-label="Bilgi paneli">
+    <div class="section" id="selectionSection" hidden></div>
+    <div class="section" aria-labelledby="hSum">
+      <div class="section-h"><h2 id="hSum">Rota özeti</h2><span class="diff-tag" id="diffTagTop" hidden></span></div>
+      <div id="summary" aria-live="polite"></div>
+    </div>
+  </aside>
+  <div class="backdrop" id="backdrop"></div>
+</div>
+
+<footer class="bottombar">
+  <div class="bb-item" title="İmleç koordinatı"><span class="hide-sm">Konum</span><b id="cursorCoord">—</b></div>
+  <div class="bb-item hide-sm" title="Temsili yükselti"><span>Yükselti</span><b id="cursorElev">—</b></div>
+  <div class="bb-item"><div class="scalebar"><i id="scaleBarLine" style="width:80px"></i><span id="scaleBarText">—</span></div></div>
+  <div class="bb-item hide-sm"><span>Yakınlık</span><b id="zoomText">—</b></div>
+  <div class="bb-spacer"></div>
+</footer>
+
+<!-- Onboarding / help -->
+<dialog id="helpDlg" aria-labelledby="helpTitle">
+  <div class="dlg-head"><h2 id="helpTitle">Mars Rota Planlayıcı'ya hoş geldiniz</h2><button class="icon-btn" data-close aria-label="Kapat"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-body">
+    <ol class="steps">
+      <li><div><b>Başlangıç noktası seçin</b><span>Haritada herhangi bir yere tıklayın. İlk nokta başlangıç olur.</span></div></li>
+      <li><div><b>Güvenli rotayı oluşturun</b><span>Varış noktasını eklediğinizde sistem dik ve pürüzlü alanlardan kaçınmaya öncelik veren rotayı hesaplar.</span></div></li>
+      <li><div><b>Özeti inceleyin, kaydedin</b><span>Mesafe, süre, arazi zorluğu ve enerji ihtiyacı anında güncellenir. Rotanıza isim verip kaydedin ya da dışa aktarın.</span></div></li>
+    </ol>
+    <div class="shortcuts" aria-label="Klavye kısayolları">
+      <kbd>← ↑ → ↓</kbd><span>Haritayı kaydır (seçili nokta odaktayken noktayı taşır)</span>
+      <kbd>+ / −</kbd><span>Yakınlaştır / uzaklaştır</span>
+      <kbd>Enter</kbd><span>Harita odaktayken merkeze nokta ekle</span>
+      <kbd>Delete</kbd><span>Seçili noktayı sil</span>
+      <kbd>Ctrl + Z</kbd><span>Son değişikliği geri al</span>
+      <kbd>Esc</kbd><span>Seçimi veya ekleme modunu iptal et</span>
+    </div>
+    <p class="hint-text">Harita CTX yükseklik modeli ve HiRISE türetilmiş eğim verisini kullanır. Rota, sunucudaki arazi motorunda hesaplanır.</p>
+  </div>
+  <div class="dlg-foot"><button class="btn" data-close id="startEmpty">Boş başla</button><button class="btn primary" id="loadSample"><svg class="ic"><use href="#i-route"/></svg>Örnek rotayı yükle</button></div>
+</dialog>
+
+<dialog id="exportDlg" aria-labelledby="exportTitle">
+  <div class="dlg-head"><h2 id="exportTitle">Rotayı dışa aktar</h2><button class="icon-btn" data-close aria-label="Kapat"><svg class="ic"><use href="#i-x"/></svg></button></div>
+  <div class="dlg-body">
+    <div class="export-meta" id="exportMeta"></div>
+    <div class="tabs" role="tablist" aria-label="Biçim">
+      <button role="tab" data-fmt="geojson" aria-selected="true">GeoJSON</button>
+      <button role="tab" data-fmt="json" aria-selected="false">JSON</button>
+      <button role="tab" data-fmt="csv" aria-selected="false">CSV</button>
+    </div>
+    <label class="sr-only" for="exportText">Dışa aktarma içeriği</label>
+    <textarea class="export-pre" id="exportText" readonly spellcheck="false"></textarea>
+    <p class="hint-text">Koordinatlar Mars gezegen-merkezli enlem/boylam (doğu pozitif) biçimindedir. Doğrudan dosya indirme bu ilk sürümde yok; içeriği kopyalayıp bir dosyaya yapıştırabilirsiniz.</p>
+  </div>
+  <div class="dlg-foot"><button class="btn" data-close>Kapat</button><button class="btn primary" id="copyExport"><svg class="ic"><use href="#i-copy"/></svg>Panoya kopyala</button></div>
+</dialog>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script type="text/plain" id="disabled-synthetic-planner">
+(() => {
+"use strict";
+/* =========================================================
+   Sabitler ve yardımcılar
+   ========================================================= */
+const W = 3600, H = 1800;            // dünya birimi: 10 birim = 1 derece
+const HW = 1800, HH = 900;           // yükseklik ızgarası
+const SX = W / HW;
+const R_MARS = 3389.5;
+const KM_PER_UNIT = 2 * Math.PI * R_MARS / 3600;
+const SOL_H = 24.66;
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const nf0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const toWorld = (lon, lat) => ({ x: (lon + 180) * 10, y: (90 - lat) * 10 });
+const toLL = (x, y) => ({ lon: x / 10 - 180, lat: 90 - y / 10 });
+function fmtLL(x, y) {
+  const { lon, lat } = toLL(x, y);
+  return `${Math.abs(lat).toFixed(2).replace('.', ',')}° ${lat >= 0 ? 'K' : 'G'}, ${Math.abs(lon).toFixed(2).replace('.', ',')}° ${lon >= 0 ? 'D' : 'B'}`;
+}
+function haversine(a, b) {
+  const r = Math.PI / 180;
+  const dLat = (b.lat - a.lat) * r, dLon = (b.lon - a.lon) * r;
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLon / 2) ** 2;
+  return 2 * R_MARS * Math.asin(Math.min(1, Math.sqrt(s)));
+}
+let uidN = 0; const uid = () => 'p' + Date.now().toString(36) + (uidN++);
+const store = {
+  ok: true, mem: {},
+  get(k) { try { const v = localStorage.getItem(k); return v == null ? this.mem[k] ?? null : v; } catch (e) { this.ok = false; return this.mem[k] ?? null; } },
+  set(k, v) { this.mem[k] = v; try { localStorage.setItem(k, v); return true; } catch (e) { this.ok = false; return false; } }
+};
+
+/* =========================================================
+   Örnek veriler (temsili; konumlar yaklaşık)
+   ========================================================= */
+const CATS = {
+  krater: { name: 'Krater', icon: 'i-krater' },
+  dag: { name: 'Dağ', icon: 'i-dag' },
+  inis: { name: 'İniş alanı', icon: 'i-inis' },
+  su: { name: 'Su izi', icon: 'i-su' },
+  arastirma: { name: 'Araştırma bölgesi', icon: 'i-arastirma' }
+};
+const POIS = [
+  { id: 'olympus', name: 'Olympus Mons', cat: 'dag', lon: -134, lat: 18.6, desc: 'Güneş Sistemi\'nde bilinen en yüksek volkanlardan biri. Çok geniş tabanlı, yumuşak eğimli bir kalkan volkanı.', facts: [['Tür', 'Kalkan volkanı'], ['Yükseklik', '~22 km'], ['Taban çapı', '~600 km']] },
+  { id: 'arsia', name: 'Arsia Mons', cat: 'dag', lon: -120.5, lat: -8.3, desc: 'Tharsis Montes zincirinin en güneydeki volkanı; zirvesinde geniş bir kaldera bulunur.', facts: [['Tür', 'Kalkan volkanı'], ['Bölge', 'Tharsis']] },
+  { id: 'pavonis', name: 'Pavonis Mons', cat: 'dag', lon: -113, lat: 1.5, desc: 'Tharsis Montes\'in ortadaki volkanı, ekvatorun hemen kuzeyinde.', facts: [['Tür', 'Kalkan volkanı'], ['Bölge', 'Tharsis']] },
+  { id: 'ascraeus', name: 'Ascraeus Mons', cat: 'dag', lon: -104.5, lat: 11.8, desc: 'Tharsis Montes zincirinin kuzeydeki ve en yüksek üyesi.', facts: [['Tür', 'Kalkan volkanı'], ['Bölge', 'Tharsis']] },
+  { id: 'elysium', name: 'Elysium Mons', cat: 'dag', lon: 147, lat: 25, desc: 'Elysium volkanik bölgesinin en büyük yapısı.', facts: [['Tür', 'Volkan'], ['Bölge', 'Elysium']] },
+  { id: 'hellas', name: 'Hellas Planitia', cat: 'krater', lon: 70, lat: -42.4, desc: 'Gezegenin en büyük çarpma havzalarından biri; Mars\'ın en alçak bölgelerini barındırır.', facts: [['Çap', '~2.300 km'], ['Derinlik', '~7 km'], ['Tür', 'Çarpma havzası']] },
+  { id: 'argyre', name: 'Argyre Planitia', cat: 'krater', lon: -43, lat: -49.7, desc: 'Güney yarımkürede, dağlık bir halka ile çevrili büyük çarpma havzası.', facts: [['Çap', '~1.800 km'], ['Tür', 'Çarpma havzası']] },
+  { id: 'gale', name: 'Gale Krateri', cat: 'krater', lon: 137.8, lat: -5.4, desc: 'Ortasında katmanlı tortullardan oluşan Aeolis Mons (Mount Sharp) yükselir.', facts: [['Çap', '~154 km'], ['Merkez tepe', 'Aeolis Mons']] },
+  { id: 'huygens', name: 'Huygens Krateri', cat: 'krater', lon: 55.6, lat: -14, desc: 'Güney yaylalarında, çok halkalı büyük bir krater.', facts: [['Çap', '~470 km']] },
+  { id: 'schiap', name: 'Schiaparelli Krateri', cat: 'krater', lon: 16.8, lat: -2.7, desc: 'Ekvator yakınında, tabanı tortullarla dolmuş geniş bir krater.', facts: [['Çap', '~460 km']] },
+  { id: 'jezero', name: 'Jezero Krateri', cat: 'inis', lon: 77.5, lat: 18.4, desc: 'Antik bir göl yatağı ve delta içeren krater; Perseverance gezgininin iniş bölgesi.', facts: [['Görev', 'Perseverance'], ['İniş yılı', '2021'], ['Krater çapı', '~45 km']] },
+  { id: 'bradbury', name: 'Bradbury İniş Noktası', cat: 'inis', lon: 137.4, lat: -4.6, desc: 'Gale Krateri içinde Curiosity gezgininin indiği nokta.', facts: [['Görev', 'Curiosity'], ['İniş yılı', '2012']] },
+  { id: 'gusev', name: 'Gusev Krateri', cat: 'inis', lon: 175.5, lat: -14.6, desc: 'Spirit gezgininin keşif yaptığı krater.', facts: [['Görev', 'Spirit'], ['İniş yılı', '2004']] },
+  { id: 'meridiani', name: 'Meridiani Planum', cat: 'inis', lon: -5.5, lat: -2, desc: 'Hematit açısından zengin ova; Opportunity gezgininin çalışma alanı.', facts: [['Görev', 'Opportunity'], ['İniş yılı', '2004']] },
+  { id: 'chryse', name: 'Chryse Planitia', cat: 'inis', lon: -48, lat: 22.5, desc: 'Viking 1 iniş aracının indiği geniş kuzey ovası.', facts: [['Görev', 'Viking 1'], ['İniş yılı', '1976']] },
+  { id: 'utopia', name: 'Utopia Planitia', cat: 'inis', lon: 109.9, lat: 25.1, desc: 'Kuzey ovalarındaki dev havza; Zhurong gezgininin iniş bölgesi.', facts: [['Görev', 'Zhurong'], ['İniş yılı', '2021']] },
+  { id: 'insight', name: 'Elysium Planitia (InSight)', cat: 'inis', lon: 135.6, lat: 4.5, desc: 'İç yapı ve sismik aktivite ölçümleri yapan InSight sabit iniş aracının konumu.', facts: [['Görev', 'InSight'], ['İniş yılı', '2018']] },
+  { id: 'npole', name: 'Kuzey Kutup Buzul Örtüsü', cat: 'su', lon: 0, lat: 86, desc: 'Büyük ölçüde su buzundan oluşan, mevsimsel olarak CO₂ buzuyla örtülen kutup örtüsü.', facts: [['İçerik', 'Su buzu, CO₂ buzu'], ['Tür', 'Kutup örtüsü']] },
+  { id: 'spole', name: 'Güney Kutup Katmanlı Tortulları', cat: 'su', lon: 0, lat: -85, desc: 'Buz ve toz katmanlarından oluşan kalın kutup tortulları.', facts: [['İçerik', 'Buz ve toz'], ['Tür', 'Katmanlı tortul']] },
+  { id: 'eberswalde', name: 'Eberswalde Deltası', cat: 'su', lon: -33, lat: -24, desc: 'Geçmişte akan suyun bıraktığı düşünülen, iyi korunmuş bir delta yapısı.', facts: [['Tür', 'Antik delta']] },
+  { id: 'kasei', name: 'Kasei Valles', cat: 'su', lon: -65, lat: 24, desc: 'Büyük ölçekli taşkınlarla oluştuğu düşünülen dış akış kanalları sistemi.', facts: [['Tür', 'Dış akış kanalı']] },
+  { id: 'nili', name: 'Nili Fossae', cat: 'arastirma', lon: 78.5, lat: 22.3, desc: 'Kil mineralleri ve karbonatlar içeren çukur sistemi; yüksek bilimsel öncelikli bölge.', facts: [['Öne çıkan', 'Kil, karbonat'], ['Öncelik', 'Yüksek (örnek)']] },
+  { id: 'mawrth', name: 'Mawrth Vallis', cat: 'arastirma', lon: -19, lat: 22.6, desc: 'Katmanlı kil yataklarıyla bilinen eski bir vadi.', facts: [['Öne çıkan', 'Kil katmanları'], ['Öncelik', 'Orta (örnek)']] },
+  { id: 'aram', name: 'Aram Chaos', cat: 'arastirma', lon: -21, lat: 2.6, desc: 'Kırıklı, kaotik arazi ve hidratlı mineraller içeren krater.', facts: [['Öne çıkan', 'Hidratlı mineraller'], ['Öncelik', 'Orta (örnek)']] },
+  { id: 'medusae', name: 'Medusae Fossae', cat: 'arastirma', lon: -160, lat: -5, desc: 'Rüzgârla aşınmış, kolay ufalanan geniş tortul formasyonu.', facts: [['Öne çıkan', 'Rüzgâr aşınması'], ['Öncelik', 'Düşük (örnek)']] }
+].map(p => ({ ...p, ...toWorld(p.lon, p.lat) }));
+
+const REGIONS = [
+  { id: 'r-vm', name: 'Valles Marineris', kind: 'Kanyon sistemi', lon: -68, lat: -16, desc: 'Binlerce kilometre boyunca uzanan dev kanyon sistemi; yer yer birkaç kilometre derinliğe ulaşır.', facts: [['Uzunluk', '~4.000 km'], ['Tür', 'Vadi / kanyon']] },
+  { id: 'r-th', name: 'Tharsis', kind: 'Volkanik plato', lon: -100, lat: -24, desc: 'Gezegenin en büyük volkanlarını taşıyan yüksek volkanik bölge.', facts: [['Tür', 'Volkanik yayla']] },
+  { id: 'r-vb', name: 'Vastitas Borealis', kind: 'Kuzey ovaları', lon: 30, lat: 62, desc: 'Kuzey yarımküreyi kaplayan alçak ve görece düz ovalar.', facts: [['Tür', 'Ova']] },
+  { id: 'r-at', name: 'Arabia Terra', kind: 'Eski yaylalar', lon: 22, lat: 24, desc: 'Yoğun kraterli, aşınmış eski yayla bölgesi.', facts: [['Tür', 'Yayla']] },
+  { id: 'r-tc', name: 'Terra Cimmeria', kind: 'Güney yaylaları', lon: 150, lat: -38, desc: 'Engebeli, kraterlerle dolu güney yaylaları.', facts: [['Tür', 'Yayla']] }
+].map(p => ({ ...p, ...toWorld(p.lon, p.lat) }));
+
+const VEHICLES = [
+  { id: 'pressurized', name: 'Basınçlı keşif aracı (mürettebatlı)', speed: 12, hours: 10, kwh: 1.8, battery: 180, note: 'Örnek model: 12 km/sa, günde 10 saat sürüş, 1,8 kWh/km, 180 kWh batarya.' },
+  { id: 'light', name: 'Hafif keşif aracı', speed: 5, hours: 8, kwh: 0.6, battery: 40, note: 'Örnek model: 5 km/sa, günde 8 saat sürüş, 0,6 kWh/km, 40 kWh batarya.' },
+  { id: 'rover', name: 'Robotik gezgin', speed: 0.15, hours: 6, kwh: 0.35, battery: 2.5, note: 'Örnek model: 0,15 km/sa, günde 6 saat sürüş, 0,35 kWh/km. Uzun rotalar yıllar sürebilir.' }
+];
+
+const SAMPLE = { name: 'Jezero – Isidis keşif rotası', vehicle: 'pressurized', dwell: 0, routeStrategy: 'safe', pts: [[77.5, 18.4], [88.5, 12.5]] };
+
+/* =========================================================
+   Durum
+   ========================================================= */
+const state = {
+  points: [], selected: null, mode: 'auto',
+  filters: new Set(Object.keys(CATS)), showPois: true, labels: true, grid: true,
+  view: { tx: 0, ty: 0, k: 0.4 }, viewMode: 'natural',
+  vehicle: 'pressurized', dwell: 0, pathMode: 'terrain', routeStrategy: 'safe', hintHidden: false, ready: false
+};
+const history = [];
+let stats = null, routeOptions = {};
+
+/* =========================================================
+   Arazi üretimi (temsili)
+   ========================================================= */
+let heights, slopes, hMin, hMax, eLo, eHi, slopeRef;
+function hash2(x, y, s) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(s, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967295;
+}
+function vnoise(x, y, s) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  let fx = x - xi, fy = y - yi;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+  const a = hash2(xi, yi, s), b = hash2(xi + 1, yi, s), c = hash2(xi, yi + 1, s), d = hash2(xi + 1, yi + 1, s);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+function fbm(x, y, oct, s) {
+  let sum = 0, amp = 0.5, f = 1, norm = 0;
+  for (let i = 0; i < oct; i++) { sum += amp * vnoise(x * f, y * f, s + i * 17); norm += amp; amp *= 0.5; f *= 2.03; }
+  return sum / norm;
+}
+function mulberry(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const tick = () => new Promise(r => setTimeout(r, 0));
+
+function addRadial(cx, cy, r, fn) {
+  const R = r * 1.9;
+  const i0 = Math.max(0, Math.floor((cx - R) / SX)), i1 = Math.min(HW - 1, Math.ceil((cx + R) / SX));
+  const j0 = Math.max(0, Math.floor((cy - R) / SX)), j1 = Math.min(HH - 1, Math.ceil((cy + R) / SX));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const dx = (i + 0.5) * SX - cx, dy = (j + 0.5) * SX - cy;
+    const t = Math.sqrt(dx * dx + dy * dy) / r;
+    if (t < 1.9) heights[j * HW + i] += fn(t, i, j);
+  }
+}
+const volcano = (A, cal = 0.12) => t => {
+  if (t >= 1.6) return 0;
+  let v = t < 1 ? A * Math.pow(1 - t, 1.25) : 0;
+  v += A * 0.06 * Math.exp(-(((t - 1) / 0.3) ** 2));
+  if (t < cal) v -= A * 0.18 * (1 - t / cal);
+  return v;
+};
+const crater = (D, rim) => t => {
+  let v = 0;
+  if (t < 1) v -= D * (1 - t * t);
+  v += rim * Math.exp(-(((t - 0.98) / 0.16) ** 2));
+  return v;
+};
+function trench(lls, width, depth) {
+  const pts = lls.map(([lo, la]) => toWorld(lo, la));
+  let minx = Infinity, miny = Infinity, maxx = -Infinity, maxy = -Infinity;
+  pts.forEach(p => { minx = Math.min(minx, p.x); maxx = Math.max(maxx, p.x); miny = Math.min(miny, p.y); maxy = Math.max(maxy, p.y); });
+  const pad = width * 3;
+  const i0 = Math.max(0, Math.floor((minx - pad) / SX)), i1 = Math.min(HW - 1, Math.ceil((maxx + pad) / SX));
+  const j0 = Math.max(0, Math.floor((miny - pad) / SX)), j1 = Math.min(HH - 1, Math.ceil((maxy + pad) / SX));
+  for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
+    const px = (i + 0.5) * SX, py = (j + 0.5) * SX;
+    let best = Infinity, bt = 0, seg = 0;
+    for (let s = 0; s < pts.length - 1; s++) {
+      const a = pts[s], b = pts[s + 1], vx = b.x - a.x, vy = b.y - a.y;
+      const t = clamp(((px - a.x) * vx + (py - a.y) * vy) / (vx * vx + vy * vy), 0, 1);
+      const d = Math.hypot(px - a.x - vx * t, py - a.y - vy * t);
+      if (d < best) { best = d; bt = t; seg = s; }
+    }
+    const along = (seg + bt) / (pts.length - 1);
+    const taper = Math.sin(Math.PI * clamp(along * 1.05, 0.04, 0.96)) ** 0.5;
+    const w = width * (0.75 + 0.5 * vnoise(px / 40, py / 40, 91));
+    heights[j * HW + i] -= depth * taper * Math.exp(-((best / w) ** 2.4));
+  }
+}
+
+async function generateTerrain(onProgress) {
+  heights = new Float32Array(HW * HH);
+  // temel yüzey: güney yaylaları / kuzey ovaları + fraktal gürültü
+  for (let j = 0; j < HH; j++) {
+    for (let i = 0; i < HW; i++) {
+      const wx = (i + 0.5) * SX, wy = (j + 0.5) * SX;
+      const lon = wx / 10 - 180, lat = 90 - wy / 10;
+      const bLat = 6 + 12 * Math.sin((lon + 40) * Math.PI / 180 * 1.3) + 5 * Math.sin(lon * Math.PI / 180 * 3.1);
+      const south = 1 / (1 + Math.exp(-(bLat - lat) / 6));
+      const n = fbm(wx / 230, wy / 230, 5, 7) - 0.5;
+      const big = fbm(wx / 900, wy / 900, 2, 3) - 0.5;
+      const fine = fbm(wx / 42, wy / 42, 3, 73) - 0.5;
+      heights[j * HW + i] = 0.22 * south + n * (0.13 + 0.22 * south) + 0.18 * big + fine * (0.018 + 0.02 * south);
+    }
+    if (j % 48 === 0) { await onProgress(j / HH * 0.45); await tick(); }
+  }
+  // Tharsis şişkinliği ve volkanlar
+  const ll = (lo, la) => toWorld(lo, la);
+  let c = ll(-108, -2); addRadial(c.x, c.y, 380, t => t < 1.9 ? 0.55 * Math.exp(-((t * 1.05) ** 2)) : 0);
+  c = ll(147, 24); addRadial(c.x, c.y, 160, t => t < 1.9 ? 0.18 * Math.exp(-((t * 1.2) ** 2)) : 0);
+  [['olympus', 85, 2.6], ['arsia', 55, 1.5], ['pavonis', 48, 1.35], ['ascraeus', 52, 1.6], ['elysium', 45, 1.1]].forEach(([id, r, A]) => {
+    const p = POIS.find(q => q.id === id); addRadial(p.x, p.y, r, volcano(A));
+  });
+  await onProgress(0.5); await tick();
+  // büyük havzalar ve kraterler
+  [['hellas', 200, 1.25, 0.22], ['argyre', 95, 0.7, 0.25], ['gale', 18, 0.35, 0.12], ['huygens', 26, 0.22, 0.08], ['schiap', 24, 0.2, 0.08], ['jezero', 10, 0.18, 0.08], ['gusev', 14, 0.18, 0.07]].forEach(([id, r, D, rim]) => {
+    const p = POIS.find(q => q.id === id); addRadial(p.x, p.y, r, crater(D, rim));
+  });
+  const g = POIS.find(q => q.id === 'gale'); addRadial(g.x + 1, g.y + 1, 6, t => t < 1.5 ? 0.22 * Math.exp(-((t * 1.4) ** 2)) : 0);
+  c = ll(110, 45); addRadial(c.x, c.y, 260, t => t < 1.9 ? -0.12 * Math.exp(-((t * 1.1) ** 2)) : 0);
+  c = ll(85, 13); addRadial(c.x, c.y, 75, crater(0.16, 0.05));
+  await onProgress(0.58); await tick();
+  // rastgele kraterler
+  const rnd = mulberry(1977);
+  for (let n = 0; n < 1200; n++) {
+    const x = rnd() * W, y = 60 + rnd() * (H - 120);
+    const lat = 90 - y / 10;
+    if (lat > 20 && rnd() < 0.6) continue;
+    const r = 2.5 + Math.pow(rnd(), 3.2) * 32;
+    addRadial(x, y, r, crater(0.03 + r * 0.0045, 0.015 + r * 0.0022));
+    if (n % 200 === 0) { await onProgress(0.58 + n / 1200 * 0.2); await tick(); }
+  }
+  // vadiler
+  trench([[-96, -6.5], [-85, -7.5], [-74, -9.5], [-62, -11], [-52, -12.5], [-44, -9], [-38, -3], [-34, 3]], 16, 0.95);
+  trench([[-76, 18], [-68, 22], [-60, 25], [-52, 24], [-46, 22]], 8, 0.28);
+  trench([[80, 18], [76, 22], [73, 27]], 4, 0.12);
+  trench([[-19, 16], [-18, 22], [-17, 28]], 4, 0.1);
+  await onProgress(0.86); await tick();
+
+  // istatistik
+  hMin = Infinity; hMax = -Infinity;
+  for (let k = 0; k < heights.length; k++) { const v = heights[k]; if (v < hMin) hMin = v; if (v > hMax) hMax = v; }
+  const samp = []; for (let k = 0; k < heights.length; k += 29) samp.push(heights[k]);
+  samp.sort((a, b) => a - b);
+  eLo = samp[Math.floor(samp.length * 0.01)]; eHi = samp[Math.floor(samp.length * 0.995)];
+  slopes = new Float32Array(HW * HH);
+  for (let j = 0; j < HH; j++) for (let i = 0; i < HW; i++) {
+    const L = heights[j * HW + Math.max(0, i - 1)], Rr = heights[j * HW + Math.min(HW - 1, i + 1)];
+    const U = heights[Math.max(0, j - 1) * HW + i], D = heights[Math.min(HH - 1, j + 1) * HW + i];
+    slopes[j * HW + i] = Math.hypot(Rr - L, D - U) / 2;
+  }
+  const ss = []; for (let k = 0; k < slopes.length; k += 31) ss.push(slopes[k]);
+  ss.sort((a, b) => a - b); slopeRef = ss[Math.floor(ss.length * 0.97)];
+  buildCostGrid();
+  await onProgress(0.92); await tick();
+  paintTerrain();
+  await onProgress(1);
+}
+
+const RAMP_NAT = [[0, [62, 26, 16]], [0.18, [104, 42, 24]], [0.38, [150, 64, 34]], [0.56, [185, 92, 52]], [0.74, [205, 128, 82]], [0.9, [222, 172, 122]], [1, [238, 214, 178]]];
+const RAMP_ELEV = [[0, [24, 38, 104]], [0.14, [36, 96, 170]], [0.3, [48, 168, 160]], [0.46, [150, 196, 104]], [0.6, [228, 196, 90]], [0.74, [222, 120, 60]], [0.88, [166, 64, 44]], [1, [246, 240, 232]]];
+function ramp(stops, t) {
+  for (let s = 1; s < stops.length; s++) if (t <= stops[s][0]) {
+    const [a, ca] = stops[s - 1], [b, cb] = stops[s], f = (t - a) / (b - a);
+    return [ca[0] + (cb[0] - ca[0]) * f, ca[1] + (cb[1] - ca[1]) * f, ca[2] + (cb[2] - ca[2]) * f];
+  }
+  return stops[stops.length - 1][1];
+}
+function paintTerrain() {
+  const cv = $('#terrain'), ctx = cv.getContext('2d');
+  if (!ctx) throw new Error('Tarayıcı tuval (canvas) desteği vermiyor.');
+  const img = ctx.createImageData(HW, HH), d = img.data;
+  const elev = state.viewMode === 'elev';
+  for (let j = 0; j < HH; j++) for (let i = 0; i < HW; i++) {
+    const k = j * HW + i, h = heights[k];
+    const L = heights[j * HW + Math.max(0, i - 1)], Rr = heights[j * HW + Math.min(HW - 1, i + 1)];
+    const U = heights[Math.max(0, j - 1) * HW + i], D = heights[Math.min(HH - 1, j + 1) * HW + i];
+    const gx = (Rr - L) / (2 * SX), gy = (D - U) / (2 * SX);
+    const nx = -gx * 24, ny = -gy * 24, nz = 1;
+    const invNormal = 1 / Math.sqrt(nx * nx + ny * ny + nz * nz);
+    const light = (nx * -0.52 + ny * -0.62 + nz * 0.88) * invNormal;
+    const sh = clamp(1.02 + 0.42 * (light - 0.56), 0.72, 1.25);
+    let t = clamp((h - eLo) / (eHi - eLo), 0, 1);
+    let col;
+    const lat = 90 - (j + 0.5) * SX / 10, wx = (i + 0.5) * SX, wy = (j + 0.5) * SX;
+    if (elev) { col = ramp(RAMP_ELEV, t); }
+    else {
+      col = ramp(RAMP_NAT, t * 0.75 + 0.18);
+      const alb = 0.78 + 0.42 * fbm(wx / 300 + 40, wy / 300, 3, 55);
+      col = [col[0] * alb, col[1] * alb, col[2] * alb];
+    }
+    const icy = Math.max(clamp((lat - 79 + 3 * (vnoise(wx / 30, wy / 30, 5) - 0.5)) / 4, 0, 1), clamp((-lat - 81 + 3 * (vnoise(wx / 30, wy / 30, 6) - 0.5)) / 3.5, 0, 1));
+    if (icy > 0) { const w = elev ? icy * 0.7 : icy * 0.85; col = [col[0] + (236 - col[0]) * w, col[1] + (232 - col[1]) * w, col[2] + (226 - col[2]) * w]; }
+    const o = k * 4;
+    d[o] = clamp(col[0] * sh, 0, 255); d[o + 1] = clamp(col[1] * sh, 0, 255); d[o + 2] = clamp(col[2] * sh, 0, 255); d[o + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+function sampleH(x, y) {
+  const i = clamp(Math.floor(x / SX), 0, HW - 1), j = clamp(Math.floor(y / SX), 0, HH - 1);
+  return { h: heights[j * HW + i], s: slopes[j * HW + i] };
+}
+const elevM = h => -8200 + (h - hMin) / (hMax - hMin) * (21200 + 8200);
+const diffAt = (x, y) => clamp(sampleH(x, y).s / (slopeRef * 1.25), 0, 1);
+function diffLabel(d) {
+  if (d < 0.22) return { t: 'Kolay', c: 'var(--ok)' };
+  if (d < 0.4) return { t: 'Orta', c: 'var(--warn)' };
+  if (d < 0.6) return { t: 'Zor', c: 'var(--hard)' };
+  return { t: 'Çok zor', c: 'var(--vhard)' };
+}
+
+/* =========================================================
+   Rota bulma: zorluk ağırlıklı A* (temsili yüzey üzerinde)
+   ========================================================= */
+const ROUTE_STRATEGIES = {
+  safe: { name: 'Güvenli rota', slope: 8, steep: 40, rough: 8, elev: 30, block: 400 }
+};
+const GW = 720, GH = 360, GS = W / GW;
+const KM_CELL = KM_PER_UNIT * GS;
+let slopeGrid = null, roughGrid = null, elevGrid = null, cosRow = null, gScore, came, stamp, closedS, searchId = 0, fastPath = false;
+const pathCache = new Map();
+function buildCostGrid() {
+  slopeGrid = new Float32Array(GW * GH); roughGrid = new Float32Array(GW * GH); elevGrid = new Float32Array(GW * GH); cosRow = new Float32Array(GH);
+  for (let j = 0; j < GH; j++) {
+    cosRow[j] = Math.max(0.05, Math.cos((90 - (j + 0.5) * GS / 10) * Math.PI / 180));
+    for (let i = 0; i < GW; i++) {
+      let m = 0, low = Infinity, high = -Infinity, sum = 0, cnt = 0;
+      const x0 = Math.floor(i * HW / GW), x1 = Math.ceil((i + 1) * HW / GW);
+      const y0 = Math.floor(j * HH / GH), y1 = Math.ceil((j + 1) * HH / GH);
+      for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
+        const k = y * HW + x;
+        m = Math.max(m, slopes[k]);
+        low = Math.min(low, heights[k]);
+        high = Math.max(high, heights[k]); sum += heights[k]; cnt++;
+      }
+      const d = clamp(m / (slopeRef * 1.25), 0, 1);
+      const rough = clamp((high - low) / (slopeRef * 2.5), 0, 1);
+      slopeGrid[j * GW + i] = d;
+      roughGrid[j * GW + i] = rough;
+      elevGrid[j * GW + i] = sum / cnt;
+    }
+  }
+  // yükseklik: medyanın üstü tehlikeli kabul edilir (0..1)
+  const es = Array.from(elevGrid).filter((_, k) => k % 7 === 0).sort((a, b) => a - b);
+  const e50 = es[Math.floor(es.length * 0.5)], e97 = es[Math.floor(es.length * 0.97)];
+  for (let k = 0; k < elevGrid.length; k++) elevGrid[k] = clamp((elevGrid[k] - e50) / (e97 - e50), 0, 1);
+  pathCache.clear();
+}
+function routeCellCost(index, strategy) {
+  const p = ROUTE_STRATEGIES[strategy] || ROUTE_STRATEGIES.safe;
+  const d = slopeGrid[index], r = roughGrid[index];
+  const e = elevGrid[index];
+  return 1 + p.slope * d + p.steep * d * d + p.rough * r * r + p.elev * e * e + (d > 0.7 ? p.block : 0);
+}
+function cellLL(k) { return { lon: ((k % GW) + 0.5) * GS / 10 - 180, lat: 90 - (((k / GW) | 0) + 0.5) * GS / 10 }; }
+function astar(a, b, strategy = state.routeStrategy) {
+  const N = GW * GH;
+  if (!gScore) { gScore = new Float64Array(N); came = new Int32Array(N); stamp = new Int32Array(N); closedS = new Int32Array(N); }
+  const sid = ++searchId;
+  const ci = x => clamp(Math.floor(x / GS), 0, GW - 1), cj = y => clamp(Math.floor(y / GS), 0, GH - 1);
+  const s = cj(a.y) * GW + ci(a.x), t = cj(b.y) * GW + ci(b.x);
+  if (s === t) return [a, b];
+  const tLL = cellLL(t);
+  const hfun = k => haversine(cellLL(k), tLL);
+  // ikili yığın
+  const hk = [], hv = [];
+  const push = (f, v) => { let i = hk.length; hk.push(f); hv.push(v); while (i > 0) { const p = (i - 1) >> 1; if (hk[p] <= hk[i]) break; [hk[p], hk[i]] = [hk[i], hk[p]]; [hv[p], hv[i]] = [hv[i], hv[p]]; i = p; } };
+  const pop = () => { const v = hv[0], lk = hk.pop(), lv = hv.pop(); if (hk.length) { hk[0] = lk; hv[0] = lv; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < hk.length && hk[l] < hk[m]) m = l; if (r < hk.length && hk[r] < hk[m]) m = r; if (m === i) break; [hk[m], hk[i]] = [hk[i], hk[m]]; [hv[m], hv[i]] = [hv[i], hv[m]]; i = m; } } return v; };
+  stamp[s] = sid; gScore[s] = 0; came[s] = -1; push(hfun(s), s);
+  let found = false;
+  while (hk.length) {
+    const cur = pop();
+    if (closedS[cur] === sid) continue;
+    closedS[cur] = sid;
+    if (cur === t) { found = true; break; }
+    const cx = cur % GW, cy = (cur / GW) | 0, gc = gScore[cur], cc = routeCellCost(cur, strategy);
+    for (let dy = -1; dy <= 1; dy++) {
+      const ny = cy + dy; if (ny < 0 || ny >= GH) continue;
+      const cosm = (cosRow[cy] + cosRow[ny]) / 2;
+      for (let dx = -1; dx <= 1; dx++) {
+        if (!dx && !dy) continue;
+        const nx = cx + dx; if (nx < 0 || nx >= GW) continue;
+        const n = ny * GW + nx;
+        if (dx && dy) {
+          const sideA = cy * GW + nx, sideB = ny * GW + cx;
+          if (Math.min(routeCellCost(sideA, strategy), routeCellCost(sideB, strategy)) > 5) continue;
+        }
+        if (closedS[n] === sid) continue;
+        const km = KM_CELL * Math.hypot(dx * cosm, dy);
+        const g = gc + km * (cc + routeCellCost(n, strategy)) / 2;
+        if (stamp[n] !== sid || g < gScore[n]) { stamp[n] = sid; gScore[n] = g; came[n] = cur; push(g + hfun(n), n); }
+      }
+    }
+  }
+  if (!found) return [a, b];
+  const cells = []; for (let k = t; k !== -1; k = came[k]) cells.push(k);
+  cells.reverse();
+  let pts = cells.map(k => ({ x: ((k % GW) + 0.5) * GS, y: (((k / GW) | 0) + 0.5) * GS }));
+  pts[0] = { x: a.x, y: a.y }; pts[pts.length - 1] = { x: b.x, y: b.y };
+  const smooth = chaikin(simplify(pts, GS * 0.45));
+  return terrainPathCost(smooth, strategy) <= terrainPathCost(pts, strategy) * 1.025 ? smooth : pts;
+}
+function terrainPathCost(pts, strategy) {
+  let score = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (GS * 0.4)));
+    let prev = toLL(a.x, a.y);
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+      const ll = toLL(x, y), iCell = clamp(Math.floor(x / GS), 0, GW - 1), jCell = clamp(Math.floor(y / GS), 0, GH - 1);
+      score += haversine(prev, ll) * routeCellCost(jCell * GW + iCell, strategy);
+      prev = ll;
+    }
+  }
+  return score;
+}
+function simplify(pts, tol) {
+  if (pts.length < 3) return pts;
+  const keep = new Uint8Array(pts.length); keep[0] = keep[pts.length - 1] = 1;
+  const st = [[0, pts.length - 1]];
+  while (st.length) {
+    const [i0, i1] = st.pop(), a = pts[i0], b = pts[i1];
+    const vx = b.x - a.x, vy = b.y - a.y, L = Math.hypot(vx, vy) || 1;
+    let md = 0, mi = -1;
+    for (let i = i0 + 1; i < i1; i++) { const d = Math.abs((pts[i].x - a.x) * vy - (pts[i].y - a.y) * vx) / L; if (d > md) { md = d; mi = i; } }
+    if (md > tol) { keep[mi] = 1; st.push([i0, mi], [mi, i1]); }
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+function chaikin(pts) {
+  if (pts.length < 3) return pts;
+  const out = [pts[0]];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i], b = pts[i + 1];
+    if (i > 0) out.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+    if (i < pts.length - 2) out.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+  }
+  out.push(pts[pts.length - 1]);
+  return out;
+}
+function legPath(a, b, strategy = state.routeStrategy) {
+  if (state.pathMode !== 'terrain' || !slopeGrid) return [a, b];
+  const key = `${strategy}|${a.x.toFixed(2)},${a.y.toFixed(2)}|${b.x.toFixed(2)},${b.y.toFixed(2)}`;
+  if (pathCache.has(key)) return pathCache.get(key);
+  if (fastPath) return [a, b];
+  const p = astar(a, b, strategy);
+  pathCache.set(key, p);
+  if (pathCache.size > 400) pathCache.delete(pathCache.keys().next().value);
+  return p;
+}
+
+/* =========================================================
+   Harita görünümü
+   ========================================================= */
+const map = $('#map'), terrainEl = $('#terrain'), markersEl = $('#markers');
+let vw = 0, vh = 0, minK = 0.2;
+const MAXK = 2.4;
+function measure() {
+  const r = map.getBoundingClientRect(); vw = r.width; vh = r.height;
+  minK = Math.max(vw / W, vh / H);
+}
+function clampView() {
+  const v = state.view;
+  v.k = clamp(v.k, minK, MAXK);
+  const mw = W * v.k, mh = H * v.k;
+  v.tx = mw <= vw ? (vw - mw) / 2 : clamp(v.tx, vw - mw, 0);
+  v.ty = mh <= vh ? (vh - mh) / 2 : clamp(v.ty, vh - mh, 0);
+}
+const toScreen = (x, y) => ({ x: x * state.view.k + state.view.tx, y: y * state.view.k + state.view.ty });
+const toWorldPt = (sx, sy) => ({ x: (sx - state.view.tx) / state.view.k, y: (sy - state.view.ty) / state.view.k });
+function zoomAt(sx, sy, k) {
+  const w = toWorldPt(sx, sy);
+  state.view.k = clamp(k, minK, MAXK);
+  state.view.tx = sx - w.x * state.view.k; state.view.ty = sy - w.y * state.view.k;
+  clampView(); scheduleRender();
+}
+let animId = 0;
+function flyTo(x, y, k, dur = 450) {
+  const v = state.view, from = { ...v };
+  const tk = clamp(k ?? v.k, minK, MAXK);
+  const to = { k: tk, tx: vw / 2 - x * tk, ty: vh / 2 - y * tk };
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const id = ++animId, t0 = performance.now();
+  const step = now => {
+    if (id !== animId) return;
+    const p = reduce ? 1 : clamp((now - t0) / dur, 0, 1), e = 1 - Math.pow(1 - p, 3);
+    v.k = from.k + (to.k - from.k) * e; v.tx = from.tx + (to.tx - from.tx) * e; v.ty = from.ty + (to.ty - from.ty) * e;
+    clampView(); render();
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function fitAll() { measure(); flyTo(W / 2, H / 2, minK); }
+function fitRoute() {
+  if (state.points.length === 0) { fitAll(); return; }
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  state.points.forEach(p => { x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y); });
+  const pad = 90;
+  const k = Math.min((vw - pad * 2) / Math.max(30, x1 - x0), (vh - pad * 2) / Math.max(30, y1 - y0), 1.5);
+  flyTo((x0 + x1) / 2, (y0 + y1) / 2, k);
+}
+
+let rafPending = false;
+function scheduleRender() { if (!rafPending) { rafPending = true; requestAnimationFrame(() => { rafPending = false; render(); }); } }
+function render() {
+  const v = state.view;
+  terrainEl.style.transform = `translate(${v.tx}px,${v.ty}px) scale(${v.k * SX / SX})`;
+  drawGrid(); drawRoute(); positionMarkers(); updateScale();
+}
+function drawGrid() {
+  const g = $('#gridG');
+  if (!state.grid) { g.innerHTML = ''; return; }
+  const k = state.view.k;
+  const stepDeg = k < 0.55 ? 30 : k < 1.3 ? 10 : 5;
+  let s = '';
+  for (let lon = -180; lon <= 180; lon += stepDeg) {
+    const p = toScreen((lon + 180) * 10, 0);
+    if (p.x < -2 || p.x > vw + 2) continue;
+    const y0 = Math.max(0, toScreen(0, 0).y), y1 = Math.min(vh, toScreen(0, H).y);
+    s += `<line class="grid-line" x1="${p.x}" y1="${y0}" x2="${p.x}" y2="${y1}"/>`;
+    s += `<text class="grid-label" x="${p.x + 4}" y="${y0 + 14}">${Math.abs(lon)}°${lon === 0 || Math.abs(lon) === 180 ? '' : lon > 0 ? 'D' : 'B'}</text>`;
+  }
+  for (let lat = -90; lat <= 90; lat += stepDeg) {
+    const p = toScreen(0, (90 - lat) * 10);
+    if (p.y < -2 || p.y > vh + 2) continue;
+    const x0 = Math.max(0, toScreen(0, 0).x), x1 = Math.min(vw, toScreen(W, 0).x);
+    s += `<line class="grid-line" x1="${x0}" y1="${p.y}" x2="${x1}" y2="${p.y}"/>`;
+    s += `<text class="grid-label" x="${x0 + 4}" y="${p.y - 4}">${Math.abs(lat)}°${lat === 0 ? '' : lat > 0 ? 'K' : 'G'}</text>`;
+  }
+  g.innerHTML = s;
+}
+function drawRoute() {
+  const g = $('#routeG'), pts = state.points;
+  if (pts.length < 2) { g.innerHTML = ''; return; }
+  const flat = stats?.paths ? stats.paths.flatMap((pp, i) => i ? pp.slice(1) : pp) : pts;
+  const d = flat.map((p, i) => { const s = toScreen(p.x, p.y); return (i ? 'L' : 'M') + s.x.toFixed(1) + ' ' + s.y.toFixed(1); }).join('');
+  let labels = '';
+  if (stats && state.view.k > 0.9) {
+    stats.legs.forEach((lg, i) => {
+      const a = toScreen(pts[i].x, pts[i].y), b = toScreen(pts[i + 1].x, pts[i + 1].y);
+      if (Math.hypot(b.x - a.x, b.y - a.y) < 110) return;
+      const pp = stats.paths[i], mid = pp[Math.floor(pp.length / 2)], mm = pp.length % 2 ? mid : { x: (mid.x + pp[pp.length / 2 - 1].x) / 2, y: (mid.y + pp[pp.length / 2 - 1].y) / 2 };
+      const m = toScreen(mm.x, mm.y);
+      labels += `<text class="leg-label" x="${m.x}" y="${m.y - 8}" text-anchor="middle">${nf0.format(lg.km)} km</text>`;
+    });
+  }
+  g.innerHTML = `<path class="route-casing" d="${d}"/><path class="route-line" d="${d}"/><path class="route-flow" d="${d}"/>${labels}`;
+}
+
+/* ---- işaretçiler ---- */
+const mkEls = new Map();
+function role(i, n) { return i === 0 ? 'start' : (i === n - 1 && n > 1) ? 'end' : 'via'; }
+const roleName = r => ({ start: 'Başlangıç', end: 'Varış', via: 'Ara durak' }[r]);
+function pointName(p) {
+  if (p.name) return p.name;
+  let best = null, bd = 60;
+  REGIONS.forEach(q => { const d = Math.hypot(q.x - p.x, q.y - p.y); if (d < bd) { bd = d; best = q; } });
+  return best ? `${best.name} yakını` : 'Açık arazi noktası';
+}
+function syncMarkers() {
+  const want = new Set();
+  // bölge kartları
+  REGIONS.forEach(r => {
+    want.add(r.id);
+    let el = mkEls.get(r.id);
+    if (!el) {
+      el = document.createElement('button'); el.className = 'region-card'; el.dataset.kind = 'region'; el.dataset.id = r.id;
+      el.innerHTML = `<b>${esc(r.name)}</b><span>${esc(r.kind)}</span>`;
+      el.setAttribute('aria-label', `${r.name}, ${r.kind}. Bilgi için seçin.`);
+      markersEl.appendChild(el); mkEls.set(r.id, el);
+    }
+    el.classList.toggle('selected', state.selected?.type === 'region' && state.selected.id === r.id);
+  });
+  [].forEach(p => {
+    const vis = state.filters.has(p.cat);
+    let el = mkEls.get(p.id);
+    if (!vis) { if (el) { el.remove(); mkEls.delete(p.id); } return; }
+    want.add(p.id);
+    if (!el) {
+      el = document.createElement('button'); el.className = `poi cat-${p.cat}`; el.dataset.kind = 'poi'; el.dataset.id = p.id;
+      el.innerHTML = `<svg class="ic"><use href="#${CATS[p.cat].icon}"/></svg><span class="poi-label">${esc(p.name)}</span>`;
+      el.setAttribute('aria-label', `${p.name}, ${CATS[p.cat].name}`);
+      markersEl.appendChild(el); mkEls.set(p.id, el);
+    }
+    el.classList.toggle('selected', state.selected?.type === 'poi' && state.selected.id === p.id);
+  });
+  const n = state.points.length;
+  state.points.forEach((p, i) => {
+    want.add(p.id);
+    let el = mkEls.get(p.id);
+    if (!el) {
+      el = document.createElement('button'); el.dataset.kind = 'stop'; el.dataset.id = p.id;
+      markersEl.appendChild(el); mkEls.set(p.id, el);
+    }
+    const r = role(i, n);
+    el.className = `stop-mk ${r}` + (state.selected?.type === 'stop' && state.selected.id === p.id ? ' selected' : '');
+    el.textContent = i + 1;
+    el.setAttribute('aria-label', `Durak ${i + 1}, ${roleName(r)}: ${pointName(p)}. Taşımak için ok tuşları, silmek için Delete.`);
+  });
+  for (const [id, el] of mkEls) if (!want.has(id)) { el.remove(); mkEls.delete(id); }
+  // durak işaretçileri en üstte kalsın
+  state.points.forEach(p => markersEl.appendChild(mkEls.get(p.id)));
+  positionMarkers();
+}
+function positionMarkers() {
+  const k = state.view.k;
+  for (const [id, el] of mkEls) {
+    let x, y;
+    const kind = el.dataset.kind;
+    if (kind === 'stop') { const p = state.points.find(q => q.id === id); if (!p) continue; x = p.x; y = p.y; }
+    else if (kind === 'poi') { const p = POIS.find(q => q.id === id); x = p.x; y = p.y; const lab = el.querySelector('.poi-label'); lab.classList.toggle('lod', k > 0.8); }
+    else { const r = REGIONS.find(q => q.id === id); x = r.x; y = r.y; el.hidden = k > 1.7; }
+    const s = toScreen(x, y);
+    const off = s.x < -60 || s.y < -60 || s.x > vw + 60 || s.y > vh + 60;
+    el.style.visibility = off ? 'hidden' : '';
+    el.style.transform = `translate(${s.x.toFixed(1)}px,${s.y.toFixed(1)}px)` + (kind === 'region' ? ' translate(-50%,-50%)' : '');
+  }
+}
+function updateScale() {
+  const kmPerPx = KM_PER_UNIT / state.view.k;
+  const target = kmPerPx * 90;
+  const p = Math.pow(10, Math.floor(Math.log10(target)));
+  const nice = [1, 2, 5, 10].map(m => m * p).reduce((a, b) => Math.abs(b - target) < Math.abs(a - target) ? b : a);
+  $('#scaleBarLine').style.width = (nice / kmPerPx).toFixed(0) + 'px';
+  $('#scaleBarText').textContent = nf0.format(nice) + ' km';
+  $('#zoomText').textContent = '×' + nf1.format(state.view.k / minK);
+}
+
+/* =========================================================
+   Rota mantığı
+   ========================================================= */
+function snapshot() { return JSON.stringify(state.points); }
+function pushHistory() { history.push(snapshot()); if (history.length > 60) history.shift(); $('#undoBtn').disabled = false; }
+function undo() {
+  if (!history.length) return;
+  state.points = JSON.parse(history.pop());
+  if (state.selected?.type === 'stop' && !state.points.find(p => p.id === state.selected.id)) state.selected = null;
+  $('#undoBtn').disabled = !history.length;
+  routeChanged(); toast('Son değişiklik geri alındı');
+}
+function nearestPoi() { return null; }
+function nearestPoiOld(x, y, maxPx = 16) {
+  let best = null, bd = maxPx / state.view.k;
+  POIS.forEach(p => { if (!state.filters.has(p.cat) || !state.showPois) return; const d = Math.hypot(p.x - x, p.y - y); if (d < bd) { bd = d; best = p; } });
+  return best;
+}
+function makePoint(x, y, poi) {
+  x = clamp(x, 0, W); y = clamp(y, 0, H);
+  if (poi) return { id: uid(), x: poi.x, y: poi.y, name: poi.name, poiId: poi.id };
+  return { id: uid(), x, y, name: null };
+}
+function insertBest(pt) {
+  const P = state.points; let bi = P.length - 1, bc = Infinity;
+  for (let i = 0; i < P.length - 1; i++) {
+    const a = P[i], b = P[i + 1];
+    const c = Math.hypot(pt.x - a.x, pt.y - a.y) + Math.hypot(b.x - pt.x, b.y - pt.y) - Math.hypot(b.x - a.x, b.y - a.y);
+    if (c < bc) { bc = c; bi = i + 1; }
+  }
+  P.splice(bi, 0, pt);
+}
+function addPoint(x, y, poi, forcedMode) {
+  const mode = forcedMode || state.mode;
+  pushHistory();
+  const pt = makePoint(x, y, poi);
+  const P = state.points;
+  let msg, replaced = false;
+  if (mode === 'start' && P.length) { P[0] = pt; msg = 'Başlangıç noktası değiştirildi'; replaced = true; }
+  else if (P.length < 2) { P.push(pt); msg = P.length === 1 ? 'Başlangıç noktası eklendi' : 'Varış noktası eklendi, güvenli rota hazır'; }
+  else { P[1] = pt; msg = 'Varış noktası değiştirildi, güvenli rota yenilendi'; replaced = true; }
+  state.selected = { type: 'stop', id: pt.id };
+  setMode('auto');
+  routeChanged();
+  announce(`${msg}: ${pointName(pt)}`);
+  if (replaced && !poi) toast(msg, { action: 'Geri al', fn: undo });
+}
+function addPoiToRoute(id) {
+  const p = POIS.find(q => q.id === id);
+  addPoint(p.x, p.y, p);
+  select({ type: 'poi', id });
+  const n = state.points.length;
+  const isS = state.points[0]?.poiId === id;
+  toast(isS && n === 1 ? `${p.name} başlangıç noktası oldu. Şimdi ikinci noktaya tıklayın.` : isS ? `${p.name} başlangıç noktası oldu` : `${p.name} varış noktası oldu, güvenli rota hazır`, { action: 'Geri al', fn: undo });
+}
+function removePoint(id) {
+  const i = state.points.findIndex(p => p.id === id); if (i < 0) return;
+  pushHistory();
+  const [p] = state.points.splice(i, 1);
+  if (state.selected?.id === id) state.selected = null;
+  routeChanged();
+  toast(`“${pointName(p)}” kaldırıldı`, { action: 'Geri al', fn: undo });
+}
+function movePoint(id, dir) {
+  const i = state.points.findIndex(p => p.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= state.points.length) return;
+  pushHistory();
+  [state.points[i], state.points[j]] = [state.points[j], state.points[i]];
+  routeChanged();
+  requestAnimationFrame(() => { const b = document.querySelector(`[data-li="${id}"] [data-act="${dir < 0 ? 'up' : 'down'}"]`); (b && !b.disabled ? b : document.querySelector(`[data-li="${id}"] .si-main`))?.focus(); });
+}
+function routeChanged() {
+  computeStats(); renderRouteStrategies(); syncMarkers(); render(); renderPoints(); renderSummary(); renderSelection(); updateHint();
+}
+function renderRouteStrategies() {
+  const disabled = state.pathMode === 'straight';
+  const option = routeOptions.safe;
+  $('#strategyOptions .strategy-result').textContent = option
+    ? disabled ? `${nf0.format(option.total)} km · düz hat` : `${nf0.format(option.total)} km · ${diffLabel(option.dAvg).t}`
+    : '';
+  $('#strategyOptions').nextElementSibling.textContent = disabled
+    ? 'Düz hat seçiliyken güvenli arazi yönlendirmesi uygulanmaz.'
+    : state.points.length >= 2
+    ? 'Güvenli rota haritada gösteriliyor.'
+    : 'Başlangıç ve varış noktalarını belirleyince güvenli rota hesaplanır.';
+}
+function computeStats() {
+  routeOptions = {};
+  if (state.points.length < 2) { stats = null; return; }
+  Object.keys(ROUTE_STRATEGIES).forEach(strategy => { routeOptions[strategy] = calculateStats(strategy); });
+  stats = routeOptions.safe;
+}
+function calculateStats(strategy) {
+  const P = state.points;
+  if (P.length < 2) return null;
+  const veh = VEHICLES.find(v => v.id === state.vehicle);
+  const legs = []; const prof = [];
+  let cum = 0, total = 0, wDiff = 0, maxD = 0, time = 0, energy = 0;
+  const paths = []; let direct = 0;
+  for (let i = 0; i < P.length - 1; i++) {
+    const path = legPath(P[i], P[i + 1], strategy); paths.push(path);
+    direct += haversine(toLL(P[i].x, P[i].y), toLL(P[i + 1].x, P[i + 1].y));
+    let km = 0, dsum = 0;
+    for (let q = 0; q < path.length - 1; q++) {
+      const a = path[q], b = path[q + 1];
+      const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 3));
+      let prev = toLL(a.x, a.y);
+      for (let s = 0; s <= n; s++) {
+        const t = s / n, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t;
+        const ll = toLL(x, y);
+        if (s > 0) { const dk = haversine(prev, ll); km += dk; dsum += diffAt(x, y) * dk; }
+        prev = ll;
+        if (s > 0 || (i === 0 && q === 0)) prof.push({ km: cum + km, e: elevM(sampleH(x, y).h), d: diffAt(x, y) });
+      }
+    }
+    const dAvg = km > 0 ? dsum / km : 0;
+    legs.push({ km, d: dAvg });
+    cum += km; total += km; wDiff += dsum; maxD = Math.max(maxD, dAvg);
+    time += km / (veh.speed / (1 + 1.6 * dAvg));
+    energy += km * veh.kwh * (1 + 1.2 * dAvg);
+  }
+  const via = P.length - 2;
+  const dwellH = via * state.dwell;
+  energy += dwellH * (veh.id === 'pressurized' ? 1.2 : veh.id === 'light' ? 0.3 : 0.02);
+  const dAvg = total ? wDiff / total : 0;
+  const sols = time / veh.hours + dwellH / SOL_H;
+  let peak = -Infinity, low = Infinity;
+  prof.forEach(p => { peak = Math.max(peak, p.e); low = Math.min(low, p.e); });
+  let climb = 0; for (let q = 1; q < prof.length; q++) climb += Math.max(0, prof[q].e - prof[q - 1].e);
+  return { strategy, climb, dElev: prof[prof.length - 1].e - prof[0].e, total, direct, paths, legs, prof, dAvg, maxD, driveH: time, dwellH, sols, energy, charges: Math.max(0, Math.ceil(energy / veh.battery) - 1), veh, peak, low, count: P.length };
+}
+
+/* =========================================================
+   Panel çizimleri
+   ========================================================= */
+function stopItemHTML(p, i, n) {
+  const r = role(i, n), sel = state.selected?.type === 'stop' && state.selected.id === p.id;
+  return `<li class="stop-item${sel ? ' selected' : ''}" data-li="${p.id}">
+    <span class="dot ${r}" aria-hidden="true">${i + 1}</span>
+    <button class="si-main" data-act="select" aria-label="Durak ${i + 1}, ${roleName(r)}: ${esc(pointName(p))}. Seç ve haritada göster.">
+      <span class="si-name">${esc(pointName(p))}</span><span class="si-sub">${fmtLL(p.x, p.y)}</span></button>
+    <button class="icon-btn" data-act="del" aria-label="Durak ${i + 1} sil"><svg class="ic"><use href="#i-x"/></svg></button></li>`;
+}
+function renderPoints() {
+  const P = state.points, n = P.length, area = $('#pointsArea');
+  if (n === 0) {
+    area.innerHTML = `<div class="empty-card">
+      <div class="em-ic"><svg class="ic"><use href="#i-pin"/></svg></div>
+      <h3>Rotanız henüz boş</h3>
+      <p>Haritada iki noktaya tıklayın: ilki başlangıç, ikincisi varış olur ve aradaki rota otomatik çizilir.</p>
+      <div class="btn-row" style="justify-content:center"><button class="btn sm primary" data-act="arm-start"><svg class="ic"><use href="#i-flag"/></svg>Başlangıç noktası seç</button><button class="btn sm" data-act="sample">Örnek rota</button></div></div>`;
+    return;
+  }
+  const armed = m => state.mode === m ? ' armed' : '';
+  let html = '<ol class="stops" style="margin:0;padding:0;border:0;margin-left:0" aria-label="Rota durakları">';
+  P.forEach((p, i) => html += stopItemHTML(p, i, n));
+  html += '</ol>';
+  if (n === 1) html += `<button class="endpoint placeholder${armed('end')}" data-act="arm-end" style="margin-top:6px"><span class="dot end" aria-hidden="true">2</span><span class="ep-text"><span class="ep-title">Varış noktası ekle</span><span class="ep-sub">Haritaya tıklayın</span></span></button>`;
+  area.innerHTML = html;
+}
+function selectionTarget() {
+  const s = state.selected; if (!s) return null;
+  if (s.type === 'poi') return POIS.find(p => p.id === s.id);
+  if (s.type === 'region') return REGIONS.find(p => p.id === s.id);
+  return state.points.find(p => p.id === s.id);
+}
+function renderSelection() {
+  const sec = $('#selectionSection'), t = selectionTarget();
+  if (!t) { sec.hidden = true; sec.innerHTML = ''; return; }
+  sec.hidden = false;
+  const hs = sampleH(t.x, t.y), elev = elevM(hs.h), df = diffLabel(diffAt(t.x, t.y));
+  const close = `<button class="icon-btn close" data-act="deselect" aria-label="Seçimi kapat"><svg class="ic"><use href="#i-x"/></svg></button>`;
+  let html;
+  if (state.selected.type === 'stop') {
+    const i = state.points.indexOf(t), r = role(i, state.points.length);
+    const col = r === 'start' ? 'var(--start)' : r === 'end' ? 'var(--end)' : 'var(--via)';
+    html = `<div class="info-card"><div class="info-head">${close}
+      <span class="badge" style="color:${col}"><svg class="ic"><use href="#i-pin"/></svg>${roleName(r)} noktası</span>
+      <h3>${esc(pointName(t))}</h3><div class="coords">${fmtLL(t.x, t.y)}</div></div>
+      <div class="info-body"><dl class="kv"><dt>Tahmini yükselti</dt><dd>${nf0.format(elev)} m</dd><dt>Yerel arazi</dt><dd><span class="diff-tag" style="background:${df.c}">${df.t}</span></dd>
+      ${stats && i > 0 ? `<dt>Başlangıçtan</dt><dd>${nf0.format(stats.legs[i - 1].km)} km</dd>` : ''}</dl>
+      <p class="sample-note">Değerler temsili yüzey modelinden hesaplanır.</p>
+      <div class="btn-row"><button class="btn sm" data-act="center">Haritada ortala</button><button class="btn sm" data-act="del-sel"><svg class="ic"><use href="#i-trash"/></svg>Sil</button></div></div></div>`;
+  } else {
+    const isPoi = state.selected.type === 'poi';
+    const cat = isPoi ? CATS[t.cat] : { name: t.kind, icon: 'i-region' };
+    const color = isPoi ? `var(--c-${t.cat})` : 'var(--sand)';
+    html = `<div class="info-card"><div class="info-head">${close}
+      <span class="badge" style="color:${color}"><svg class="ic"><use href="#${cat.icon}"/></svg>${esc(cat.name)}</span>
+      <h3>${esc(t.name)}</h3><div class="coords">≈ ${fmtLL(t.x, t.y)}</div></div>
+      <div class="info-body"><p>${esc(t.desc)}</p>
+      <dl class="kv">${t.facts.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}
+      <dt>Arazi (model)</dt><dd><span class="diff-tag" style="background:${df.c}">${df.t}</span></dd></dl>
+      <p class="sample-note">Örnek bilgi · konum yaklaşık, harita temsili</p>
+      <div class="btn-row">${isPoi && state.points.some(q => q.poiId === t.id)
+        ? `<button class="btn sm" data-act="remove-poi">Rotadan çıkar</button>`
+        : state.points.length === 0
+        ? `<button class="btn sm primary" data-act="add-start">Başlangıç yap</button>`
+        : `<button class="btn sm primary" data-act="add-end">${state.points.length < 2 ? 'Varış yap' : 'Varış olarak değiştir'}</button><button class="btn sm" data-act="add-start">Başlangıç yap</button>`}
+      <button class="btn sm ghost" data-act="center">Ortala</button></div></div></div>`;
+  }
+  sec.innerHTML = html;
+}
+function fmtDuration(s) {
+  const v = s.veh;
+  if (s.sols < 1) { const h = s.driveH + s.dwellH; return { main: nf1.format(h), unit: 'saat', sub: `${nf1.format(s.driveH)} sa sürüş` }; }
+  if (s.sols > 669) return { main: nf1.format(s.sols / 668.6), unit: 'Mars yılı', sub: `≈ ${nf0.format(s.sols)} sol` };
+  return { main: nf1.format(s.sols), unit: 'sol', sub: `${nf0.format(s.driveH)} sa sürüş${s.dwellH ? ` + ${nf0.format(s.dwellH)} sa inceleme` : ''}` };
+}
+function renderSummary() {
+  const box = $('#summary'), tag = $('#diffTagTop'), chip = $('#summaryChip');
+  if (!stats) {
+    tag.hidden = true;
+    const n = state.points.length;
+    box.innerHTML = `<div class="empty-card"><div class="em-ic"><svg class="ic"><use href="#i-route"/></svg></div>
+      <h3>${n === 0 ? 'Henüz rota yok' : 'Bir nokta daha gerekli'}</h3>
+      <p>${n === 0 ? 'Haritada başlangıç ve varış noktalarını seçin; sistem güvenli arazi ölçütlerine göre rotayı hesaplasın.' : 'Bir varış noktası daha ekleyin. Sistem dik ve pürüzlü alanlardan kaçınmaya öncelik veren rotayı hesaplayacak.'}</p></div>
+      <div class="metrics" style="margin-top:12px;opacity:.45" aria-hidden="true">
+      ${['Tahmini mesafe', 'Tahmini süre', 'Yükselti farkı', 'Enerji ihtiyacı'].map(l => `<div class="metric"><div class="m-label">${l}</div><div class="m-value">—</div></div>`).join('')}</div>`;
+    chip.innerHTML = `<svg class="ic"><use href="#i-pin"/></svg>${n === 0 ? 'Haritada iki noktaya tıklayın' : 'Varış noktasına tıklayın'}`;
+    return;
+  }
+  const s = stats, dl = diffLabel(s.dAvg), dur = fmtDuration(s);
+  tag.hidden = false; tag.textContent = dl.t; tag.style.background = dl.c;
+  const profSVG = profileSVG(s.prof);
+  const strategy = ROUTE_STRATEGIES.safe;
+  const extraKm = Math.max(0, s.total - s.direct);
+  let reason;
+  if (state.pathMode === 'straight') reason = `“Düz hat” yöntemi seçili olduğu için güzergâh iki nokta arasındaki en kısa çizgiyi izliyor. Bu çizgi arazi engellerini hesaba katmaz.`;
+  else reason = `Sistem en güvenli yolu seçti: yüksek bölgeler (volkanlar, yaylalar), dik yamaçlar ve pürüzlü araziler ağır cezalandırıldı; çok dik geçişler neredeyse yasaklandı. Rota bu yüzden alçak ve düz arazileri izliyor. Yol boyunca en yüksek nokta ${nf0.format(s.peak)} m (başlangıç ya da varış yüksekteyse bu nokta onlardan biridir). Güvenlik için kuş uçuşuna göre ${nf0.format(extraKm)} km ek yol kabul edildi.`;
+  box.innerHTML = `<div class="metrics">
+    <div class="metric"><div class="m-label"><svg class="ic" style="width:14px;height:14px"><use href="#i-ruler"/></svg>Tahmini mesafe</div><div class="m-value">${nf0.format(s.total)}<small>km</small></div><div class="m-sub">${state.pathMode === 'terrain' ? `Kuş uçuşu ${nf0.format(s.direct)} km` : 'Düz hat'}</div></div>
+    <div class="metric"><div class="m-label"><svg class="ic" style="width:14px;height:14px"><use href="#i-clock"/></svg>Tahmini süre</div><div class="m-value">${dur.main}<small>${dur.unit}</small></div><div class="m-sub">${dur.sub}</div></div>
+    <div class="metric"><div class="m-label"><svg class="ic" style="width:14px;height:14px"><use href="#i-mtn"/></svg>Yükselti farkı</div><div class="m-value">${s.dElev >= 0 ? '+' : '−'}${nf0.format(Math.abs(s.dElev))}<small>m</small></div><div class="m-sub">Toplam tırmanış ${nf0.format(s.climb)} m</div></div>
+    <div class="metric"><div class="m-label"><svg class="ic" style="width:14px;height:14px"><use href="#i-bolt"/></svg>Enerji ihtiyacı</div><div class="m-value">${nf0.format(s.energy)}<small>kWh</small></div><div class="m-sub">${s.charges ? `≈ ${nf0.format(s.charges)} şarj molası` : 'Tek şarjla yeterli'}</div></div>
+    <div class="metric wide"><div class="m-label"><svg class="ic" style="width:14px;height:14px"><use href="#i-mtn"/></svg>Arazi zorluğu <span class="diff-tag" style="background:${dl.c};margin-left:auto">${dl.t}</span></div>
+      <div class="diff-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(s.dAvg * 100)}" aria-label="Ortalama arazi zorluğu"><i style="left:${(s.dAvg * 100).toFixed(1)}%"></i></div>
+      <div class="diff-scale"><span>Kolay</span><span>Orta</span><span>Zor</span><span>Çok zor</span></div>
+      <div class="m-sub" style="margin-top:6px">Yükselti ${nf0.format(s.low)} … ${nf0.format(s.peak)} m</div></div>
+  </div>
+  <div class="profile"><div class="m-label" style="font-size:11.5px;color:var(--muted)">Yükselti ve zorluk profili</div>${profSVG}</div>
+  <div class="route-reason"><h3><svg class="ic"><use href="#i-shield"/></svg>Neden bu rota? · ${esc(strategy.name)}</h3>
+    <p>${esc(reason)}</p>
+    <small>Güvenlik değerlendirmesi yalnızca temsili yükseklik, eğim ve pürüzlülük modeline dayanır; gerçek görev güvenliği veya geçilebilirlik garantisi değildir.</small></div>
+  <p class="sample-note" style="margin-top:12px">${esc(s.veh.note)} Hesaplar temsili yüzeye dayanır.</p>`;
+  chip.innerHTML = `<b>${nf0.format(s.total)} km</b> · ${dur.main} ${dur.unit} · <span style="color:${dl.c}">${dl.t}</span>`;
+}
+function profileSVG(prof) {
+  const Wd = 300, Hd = 110, padB = 14, padT = 6;
+  const maxKm = prof[prof.length - 1].km || 1;
+  let lo = Infinity, hi = -Infinity; prof.forEach(p => { lo = Math.min(lo, p.e); hi = Math.max(hi, p.e); });
+  if (hi - lo < 400) { const m = (hi + lo) / 2; lo = m - 200; hi = m + 200; }
+  const X = km => km / maxKm * Wd, Y = e => padT + (1 - (e - lo) / (hi - lo)) * (Hd - padB - padT - 8);
+  const step = Math.max(1, Math.floor(prof.length / 240));
+  const pts = prof.filter((_, i) => i % step === 0 || i === prof.length - 1);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + X(p.km).toFixed(1) + ' ' + Y(p.e).toFixed(1)).join('');
+  const band = pts.slice(1).map((p, i) => { const a = pts[i]; return `<rect x="${X(a.km).toFixed(1)}" y="${Hd - padB + 2}" width="${Math.max(0.6, X(p.km) - X(a.km)).toFixed(1)}" height="5" fill="${diffLabel(p.d).c}"/>`; }).join('');
+  return `<svg viewBox="0 0 ${Wd} ${Hd}" preserveAspectRatio="none" role="img" aria-label="Rota boyunca yükselti ${nf0.format(lo)} ile ${nf0.format(hi)} metre arasında değişiyor">
+    <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7657E8" stop-opacity=".6"/><stop offset="1" stop-color="#7657E8" stop-opacity="0"/></linearGradient></defs>
+    <path d="${line}L${Wd} ${Hd - padB - 2}L0 ${Hd - padB - 2}Z" fill="url(#pg)"/>
+    <path d="${line}" fill="none" stroke="#7DD3FC" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    ${band}</svg>
+    <div class="diff-scale" style="margin-top:2px"><span>0 km</span><span>${nf0.format(maxKm)} km</span></div>`;
+}
+function renderChips() { return;
+  const counts = {}; POIS.forEach(p => counts[p.cat] = (counts[p.cat] || 0) + 1);
+  $('#chips').innerHTML = Object.entries(CATS).map(([k, c]) =>
+    `<button class="chip cat-${k}" data-cat="${k}" aria-pressed="${state.filters.has(k)}" ${state.showPois ? '' : 'disabled'}><svg class="ic"><use href="#${c.icon}"/></svg><span style="color:var(--text)">${c.name}</span><span class="cnt">${counts[k] || 0}</span></button>`).join('');
+}
+function updateHint() {
+  const n = state.points.length, m = state.mode; let t;
+  if (m === 'start') t = 'Yeni başlangıç noktası için haritaya tıklayın · <kbd>Esc</kbd> iptal';
+  else if (m === 'end') t = n ? 'Varış noktası eklemek için haritaya tıklayın · <kbd>Esc</kbd> iptal' : 'Önce başlangıç noktası seçin: haritaya tıklayın';
+  else if (m === 'stop') t = n >= 2 ? 'Ara durak eklemek için haritaya tıklayın · <kbd>Esc</kbd> iptal' : 'Ara durak için önce başlangıç ve varış gerekli';
+  else if (n === 0) t = 'Başlangıç noktası seçmek için haritaya tıklayın';
+  else if (n === 1) t = 'Şimdi ikinci noktaya tıklayın — güvenli rota hesaplanacak';
+  else t = 'Güvenli rota hazır · yeni tıklama varış noktasını değiştirir';
+  $('#mapHintText').innerHTML = t;
+  const forced = m !== 'auto' || n < 2;
+  $('#mapHint').hidden = state.hintHidden && !forced;
+  map.classList.toggle('armed', m !== 'auto');
+}
+function setMode(m) {
+  state.mode = state.mode === m ? 'auto' : m;
+  $$('.mode-btn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === state.mode)));
+  updateHint(); renderPoints();
+}
+function select(sel, { fly = false, openPanel = false } = {}) {
+  state.selected = sel;
+  syncMarkers(); renderSelection(); renderPoints();
+  if (fly) { const t = selectionTarget(); if (t) flyTo(t.x, t.y, Math.max(state.view.k, 1.1)); }
+  if (openPanel && sel && isMobile()) openDrawer('right');
+}
+
+/* =========================================================
+   Etkileşim: harita
+   ========================================================= */
+const pointers = new Map();
+let drag = null, pinch = null;
+map.addEventListener('pointerdown', e => {
+  if (!state.ready || e.target.closest('.map-ui') || e.button > 0) return;
+  map.classList.remove('kb');
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  try { map.setPointerCapture(e.pointerId); } catch (_) {}
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()];
+    pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), k: state.view.k };
+    drag = null; return;
+  }
+  const mk = e.target.closest('[data-kind]');
+  drag = { kind: mk ? mk.dataset.kind : 'map', id: mk?.dataset.id, sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY, moved: false, el: mk };
+  animId++;
+});
+map.addEventListener('pointermove', e => {
+  const r = map.getBoundingClientRect();
+  if (state.ready) {
+    const w = toWorldPt(e.clientX - r.left, e.clientY - r.top);
+    if (w.x >= 0 && w.y >= 0 && w.x <= W && w.y <= H) {
+      $('#cursorCoord').textContent = fmtLL(w.x, w.y);
+      $('#cursorElev').textContent = nf0.format(elevM(sampleH(w.x, w.y).h)) + ' m';
+    }
+  }
+  if (!pointers.has(e.pointerId)) return;
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && pointers.size >= 2) {
+    const [a, b] = [...pointers.values()];
+    const d = Math.hypot(a.x - b.x, a.y - b.y);
+    zoomAt((a.x + b.x) / 2 - r.left, (a.y + b.y) / 2 - r.top, pinch.k * d / pinch.d);
+    return;
+  }
+  if (!drag) return;
+  if (!drag.moved && Math.hypot(e.clientX - drag.sx, e.clientY - drag.sy) > 5) {
+    drag.moved = true;
+    if (drag.kind === 'stop') { pushHistory(); fastPath = true; drag.el.classList.add('dragging'); state.selected = { type: 'stop', id: drag.id }; }
+    else map.classList.add('panning');
+  }
+  if (!drag.moved) return;
+  if (drag.kind === 'stop') {
+    const p = state.points.find(q => q.id === drag.id);
+    const w = toWorldPt(e.clientX - r.left, e.clientY - r.top);
+    p.x = clamp(w.x, 0, W); p.y = clamp(w.y, 0, H); p.name = null; p.poiId = null;
+    computeStats(); scheduleRender();
+  } else {
+    state.view.tx += e.clientX - drag.lx; state.view.ty += e.clientY - drag.ly;
+    clampView(); scheduleRender();
+  }
+  drag.lx = e.clientX; drag.ly = e.clientY;
+});
+function endPointer(e) {
+  if (!pointers.has(e.pointerId)) return;
+  pointers.delete(e.pointerId);
+  if (pinch) { if (pointers.size < 2) pinch = null; drag = null; return; }
+  if (!drag) return;
+  const d = drag; drag = null; map.classList.remove('panning');
+  if (e.type === 'pointercancel') { fastPath = false; if (d.moved && d.kind === 'stop') routeChanged(); return; }
+  const r = map.getBoundingClientRect();
+  if (d.kind === 'stop') {
+    d.el?.classList.remove('dragging');
+    fastPath = false;
+    if (d.moved) {
+      const p = state.points.find(q => q.id === d.id);
+      const poi = nearestPoi(p.x, p.y, 14);
+      if (poi) { p.x = poi.x; p.y = poi.y; p.name = poi.name; p.poiId = poi.id; }
+      routeChanged(); announce(`Durak taşındı: ${fmtLL(p.x, p.y)}`);
+    } else select({ type: 'stop', id: d.id }, { openPanel: true });
+  } else if (!d.moved) {
+    if (d.kind === 'poi') addPoiToRoute(d.id); else if (d.kind === 'region') select({ type: 'region', id: d.id }, { openPanel: true });
+    else {
+      const w = toWorldPt(e.clientX - r.left, e.clientY - r.top);
+      if (w.x < 0 || w.y < 0 || w.x > W || w.y > H) return;
+      addPoint(w.x, w.y, nearestPoi(w.x, w.y));
+    }
+  }
+}
+map.addEventListener('pointerup', endPointer);
+map.addEventListener('pointercancel', endPointer);
+map.addEventListener('pointerleave', () => { if (!drag) { $('#cursorCoord').textContent = '—'; $('#cursorElev').textContent = '—'; } });
+map.addEventListener('wheel', e => {
+  if (!state.ready) return;
+  e.preventDefault(); animId++;
+  const r = map.getBoundingClientRect();
+  const dy = e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
+  zoomAt(e.clientX - r.left, e.clientY - r.top, state.view.k * Math.exp(-dy * 0.0016));
+}, { passive: false });
+// klavye ile işaretçi tıklaması (fare tıklamaları pointer olaylarında işlenir)
+markersEl.addEventListener('click', e => {
+  if (e.detail !== 0) return;
+  const mk = e.target.closest('[data-kind]'); if (!mk) return;
+  if (mk.dataset.kind === 'stop') select({ type: 'stop', id: mk.dataset.id }, { openPanel: true });
+  else if (mk.dataset.kind === 'poi') addPoiToRoute(mk.dataset.id);
+  else select({ type: 'region', id: mk.dataset.id }, { openPanel: true });
+});
+markersEl.addEventListener('focusin', e => {
+  const mk = e.target.closest('[data-kind]'); if (!mk) return;
+  const s = toScreen(...(() => { const id = mk.dataset.id, k = mk.dataset.kind; const o = k === 'stop' ? state.points.find(p => p.id === id) : k === 'poi' ? POIS.find(p => p.id === id) : REGIONS.find(p => p.id === id); return [o.x, o.y]; })());
+  if (s.x < 30 || s.y < 30 || s.x > vw - 30 || s.y > vh - 30) { const w = toWorldPt(s.x, s.y); flyTo(w.x, w.y); }
+});
+let kbMoveTimer = 0, kbMoved = false;
+markersEl.addEventListener('keydown', e => {
+  const mk = e.target.closest('[data-kind="stop"]'); if (!mk) return;
+  const p = state.points.find(q => q.id === mk.dataset.id); if (!p) return;
+  const dirs = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+  if (dirs[e.key]) {
+    e.preventDefault(); e.stopPropagation();
+    if (!kbMoved) { pushHistory(); kbMoved = true; fastPath = true; }
+    const step = (e.shiftKey ? 40 : 8) / state.view.k;
+    p.x = clamp(p.x + dirs[e.key][0] * step, 0, W); p.y = clamp(p.y + dirs[e.key][1] * step, 0, H); p.name = null; p.poiId = null;
+    state.selected = { type: 'stop', id: p.id };
+    computeStats(); scheduleRender();
+    clearTimeout(kbMoveTimer); kbMoveTimer = setTimeout(() => { kbMoved = false; fastPath = false; routeChanged(); mkEls.get(p.id)?.focus(); announce(`Durak konumu: ${fmtLL(p.x, p.y)}`); }, 500);
+  } else if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); e.stopPropagation(); removePoint(p.id); map.focus(); }
+});
+map.addEventListener('keydown', e => {
+  if (!state.ready || e.target !== map) return;
+  const pan = 80;
+  const k = { ArrowLeft: [pan, 0], ArrowRight: [-pan, 0], ArrowUp: [0, pan], ArrowDown: [0, -pan] }[e.key];
+  if (k) { e.preventDefault(); map.classList.add('kb'); state.view.tx += k[0]; state.view.ty += k[1]; clampView(); scheduleRender(); return; }
+  if (e.key === '+' || e.key === '=') { e.preventDefault(); map.classList.add('kb'); zoomAt(vw / 2, vh / 2, state.view.k * 1.35); }
+  else if (e.key === '-' || e.key === '_') { e.preventDefault(); map.classList.add('kb'); zoomAt(vw / 2, vh / 2, state.view.k / 1.35); }
+  else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); map.classList.add('kb'); const w = toWorldPt(vw / 2, vh / 2); addPoint(w.x, w.y, nearestPoi(w.x, w.y)); }
+  else if ((e.key === 'Delete' || e.key === 'Backspace') && state.selected?.type === 'stop') { e.preventDefault(); removePoint(state.selected.id); }
+});
+map.addEventListener('focus', () => { if (!matchMedia('(pointer:coarse)').matches) map.classList.add('kb'); });
+map.addEventListener('blur', () => map.classList.remove('kb'));
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.target.matches('input,textarea')) { e.preventDefault(); undo(); }
+  if (e.key === 'Escape' && !document.querySelector('dialog[open]')) {
+    if (!$('#searchResults').hidden) { closeSearch(); return; }
+    if (document.body.classList.contains('open-left') || document.body.classList.contains('open-right')) { closeDrawers(); return; }
+    if (state.mode !== 'auto') setMode(state.mode); else if (state.selected) select(null);
+    $('#profilePop').hidden = true; $('#profileBtn').setAttribute('aria-expanded', 'false');
+  }
+});
+$('#zoomIn').onclick = () => zoomAt(vw / 2, vh / 2, state.view.k * 1.5);
+$('#zoomOut').onclick = () => zoomAt(vw / 2, vh / 2, state.view.k / 1.5);
+$('#zoomFit').onclick = fitAll;
+$('#zoomRoute').onclick = fitRoute;
+$('#hintClose').onclick = () => { state.hintHidden = true; $('#mapHint').hidden = true; };
+
+/* ---- sol panel olayları ---- */
+$('#leftPanel').addEventListener('click', e => {
+  const b = e.target.closest('[data-act],[data-mode],[data-cat]'); if (!b) return;
+  if (b.dataset.mode) { setMode(b.dataset.mode); if (isMobile() && state.mode !== 'auto') closeDrawers(); return; }
+  if (b.dataset.cat) {
+    const c = b.dataset.cat; state.filters.has(c) ? state.filters.delete(c) : state.filters.add(c);
+    if (state.selected?.type === 'poi' && !state.filters.has(POIS.find(p => p.id === state.selected.id).cat)) state.selected = null;
+    renderChips(); syncMarkers(); renderSelection(); $(`[data-cat="${c}"]`).focus(); return;
+  }
+  const li = b.closest('[data-li]'), id = li?.dataset.li, act = b.dataset.act;
+  if (act === 'select') { select({ type: 'stop', id }, { fly: true }); if (isMobile()) closeDrawers(); }
+  else if (act === 'up') movePoint(id, -1);
+  else if (act === 'down') movePoint(id, 1);
+  else if (act === 'del') { const items = $$('.stop-item'); const idx = items.indexOf(li); removePoint(id); requestAnimationFrame(() => { const n = $$('.stop-item .si-main'); (n[Math.min(idx, n.length - 1)] || $('#map')).focus(); }); }
+  else if (act === 'arm-start') { setMode('start'); if (isMobile()) closeDrawers(); else map.focus(); }
+  else if (act === 'arm-end') { setMode('end'); if (isMobile()) closeDrawers(); }
+  else if (act === 'sample') loadSample();
+  else if (act === 'open-saved') openSaved(b.dataset.id);
+  else if (act === 'del-saved') deleteSaved(b, b.dataset.id);
+});
+$('#showPois')?.addEventListener('change', e => { state.showPois = e.target.checked; map.classList.toggle('show-pois', state.showPois); renderChips(); });
+$('#undoBtn').onclick = undo;
+$('#reverseBtn').onclick = () => { if (state.points.length < 2) { toast('Ters çevirmek için en az iki nokta gerekli', { type: 'error' }); return; } pushHistory(); state.points.reverse(); routeChanged(); toast('Rota ters çevrildi'); };
+$('#clearBtn').onclick = () => { if (!state.points.length) return; pushHistory(); state.points = []; state.selected = null; routeChanged(); toast('Rota temizlendi', { action: 'Geri al', fn: undo }); };
+const vehSel = $('#vehicle');
+vehSel.innerHTML = VEHICLES.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+vehSel.onchange = () => { state.vehicle = vehSel.value; $('#vehicleNote').textContent = VEHICLES.find(v => v.id === state.vehicle).note; computeStats(); renderRouteStrategies(); renderSummary(); };
+$('#pathMode').onchange = e => { state.pathMode = e.target.value; computeStats(); renderRouteStrategies(); render(); renderSummary(); renderSelection(); };
+/* ---- sağ panel olayları ---- */
+$('#rightPanel').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const t = selectionTarget(), act = b.dataset.act;
+  if (act === 'deselect') select(null);
+  else if (act === 'center' && t) { flyTo(t.x, t.y, Math.max(state.view.k, 1.2)); if (isMobile()) closeDrawers(); }
+  else if (act === 'del-sel' && t) removePoint(t.id);
+  else if (act === 'remove-poi' && t) { const q = state.points.find(x => x.poiId === t.id); if (q) { removePoint(q.id); select({ type: 'poi', id: t.id }); } }
+  else if (act === 'add-start' && t) addPoint(t.x, t.y, t.cat ? t : null, 'start');
+  else if (act === 'add-stop' && t) addPoint(t.x, t.y, t.cat ? t : null, 'end');
+  else if (act === 'add-end' && t) addPoint(t.x, t.y, t.cat ? t : null, 'end');
+});
+$('#summaryChip').onclick = () => openDrawer('right');
+
+/* ---- alt çubuk ---- */
+$$('.seg button').forEach(b => b.onclick = () => {
+  if (state.viewMode === b.dataset.view) return;
+  state.viewMode = b.dataset.view;
+  $$('.seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  try { paintTerrain(); } catch (err) { showError(err); }
+});
+$('#gridToggle').onchange = e => { state.grid = e.target.checked; render(); };
+$('#labelToggle').onchange = e => { state.labels = e.target.checked; map.classList.toggle('show-labels', state.labels); };
+
+/* =========================================================
+   Arama
+   ========================================================= */
+const sIn = $('#searchInput'), sRes = $('#searchResults');
+let sItems = [], sIdx = -1;
+const norm = s => s.toLocaleLowerCase('tr').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/ı/g, 'i');
+function runSearch() {
+  const q = norm(sIn.value.trim());
+  if (!q) { closeSearch(); return; }
+  const all = [
+    ...REGIONS.map(r => ({ type: 'region', id: r.id, name: r.name, sub: r.kind, icon: 'i-region', cls: '' })),
+    ...state.points.map((p, i) => ({ type: 'stop', id: p.id, name: pointName(p), sub: i === 0 ? 'Başlangıç' : 'Varış', icon: 'i-pin', cls: '' }))
+  ];
+  sItems = all.filter(it => norm(it.name).includes(q) || norm(it.sub).includes(q)).slice(0, 8);
+  sIdx = sItems.length ? 0 : -1;
+  sRes.innerHTML = sItems.length
+    ? sItems.map((it, i) => `<li role="option" id="sr-${i}" aria-selected="${i === sIdx}" data-i="${i}"><svg class="ic ${it.cls}"><use href="#${it.icon}"/></svg><span>${esc(it.name)}</span><span class="cat">${esc(it.sub)}</span></li>`).join('')
+    : `<li class="empty" role="option" aria-disabled="true">“${esc(sIn.value.trim())}” için sonuç bulunamadı</li>`;
+  sRes.hidden = false; sIn.setAttribute('aria-expanded', 'true');
+  sIn.setAttribute('aria-activedescendant', sIdx >= 0 ? 'sr-0' : '');
+}
+function closeSearch() { sRes.hidden = true; sIn.setAttribute('aria-expanded', 'false'); sIn.removeAttribute('aria-activedescendant'); }
+function pickSearch(i) {
+  const it = sItems[i]; if (!it) return;
+  if (it.type === 'poi') { const p = POIS.find(q => q.id === it.id); if (!state.filters.has(p.cat)) { state.filters.add(p.cat); renderChips(); } if (!state.showPois) { state.showPois = true; map.classList.add('show-pois'); renderChips(); } }
+  select({ type: it.type, id: it.id }, { fly: true, openPanel: true });
+  sIn.value = ''; closeSearch(); document.body.classList.remove('search-open');
+}
+sIn.addEventListener('input', runSearch);
+sIn.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); if (!sItems.length) return;
+    sIdx = (sIdx + (e.key === 'ArrowDown' ? 1 : -1) + sItems.length) % sItems.length;
+    $$('#searchResults li').forEach((li, i) => li.setAttribute('aria-selected', String(i === sIdx)));
+    sIn.setAttribute('aria-activedescendant', 'sr-' + sIdx);
+  } else if (e.key === 'Enter') { e.preventDefault(); pickSearch(sIdx); }
+  else if (e.key === 'Escape') { e.stopPropagation(); sIn.value = ''; closeSearch(); }
+});
+sRes.addEventListener('mousedown', e => { const li = e.target.closest('[data-i]'); if (li) { e.preventDefault(); pickSearch(+li.dataset.i); } });
+sIn.addEventListener('blur', () => setTimeout(closeSearch, 120));
+$('#searchToggle').onclick = () => { document.body.classList.toggle('search-open'); if (document.body.classList.contains('search-open')) sIn.focus(); };
+
+/* =========================================================
+   Kaydetme, açma, dışa aktarma
+   ========================================================= */
+const KEY = 'marsRotaPlanlayici.routes.v1';
+function loadSavedList() { try { return JSON.parse(store.get(KEY) || '[]'); } catch (e) { return []; } }
+function renderSaved() {
+  const list = loadSavedList(), ul = $('#savedList');
+  if (!list.length) { ul.innerHTML = `<li style="background:none;padding:6px 0;color:var(--faint);font-size:12.5px">Kayıtlı rota yok. Kaydettiğiniz rotalar burada listelenir.</li>`; return; }
+  ul.innerHTML = list.map(r => `<li><div class="sv-main"><span class="sv-name">${esc(r.name)}</span><span class="sv-sub">${nf0.format(r.km || 0)} km · ${new Date(r.savedAt).toLocaleDateString('tr-TR')}</span></div>
+    <button class="btn sm" data-act="open-saved" data-id="${r.id}" aria-label="${esc(r.name)} rotasını aç">Aç</button>
+    <button class="icon-btn" data-act="del-saved" data-id="${r.id}" aria-label="${esc(r.name)} rotasını sil"><svg class="ic"><use href="#i-trash"/></svg></button></li>`).join('');
+}
+let currentRouteId = null;
+$('#saveBtn').onclick = () => {
+  if (state.points.length < 2) { toast('Kaydetmek için en az bir başlangıç ve bir varış noktası ekleyin', { type: 'error' }); return; }
+  let name = $('#routeName').value.trim();
+  if (!name) { name = 'Adsız rota ' + new Date().toLocaleDateString('tr-TR'); $('#routeName').value = name; }
+  const list = loadSavedList();
+  const rec = { id: currentRouteId || uid(), name, points: state.points.map(p => ({ x: p.x, y: p.y, name: p.name, poiId: p.poiId })), vehicle: state.vehicle, dwell: state.dwell, pathMode: state.pathMode, routeStrategy: state.routeStrategy, km: stats.total, savedAt: Date.now() };
+  const i = list.findIndex(r => r.id === rec.id);
+  if (i >= 0) list[i] = rec; else list.unshift(rec);
+  currentRouteId = rec.id;
+  const ok = store.set(KEY, JSON.stringify(list));
+  renderSaved();
+  if (ok) toast(`“${name}” kaydedildi`, { type: 'ok' });
+  else toast('Tarayıcı depolamasına erişilemedi; rota yalnızca bu oturum boyunca saklanacak', { type: 'error' });
+};
+function applyRoute(r) {
+  pushHistory();
+  const rp = r.points.length > 2 ? [r.points[0], r.points[r.points.length - 1]] : r.points;
+  state.points = rp.map(p => ({ id: uid(), x: p.x, y: p.y, name: p.name || null, poiId: p.poiId || null }));
+  state.vehicle = r.vehicle || 'pressurized'; vehSel.value = state.vehicle; $('#vehicleNote').textContent = VEHICLES.find(v => v.id === state.vehicle).note;
+  state.pathMode = r.pathMode || 'terrain'; $('#pathMode').value = state.pathMode;
+  state.routeStrategy = 'safe'; renderRouteStrategies();
+  $('#routeName').value = r.name || '';
+  state.selected = null; setMode('auto');
+  routeChanged(); fitRoute();
+}
+function openSaved(id) {
+  const r = loadSavedList().find(x => x.id === id);
+  if (!r) { toast('Rota bulunamadı; silinmiş olabilir', { type: 'error' }); renderSaved(); return; }
+  currentRouteId = r.id; applyRoute(r); toast(`“${r.name}” açıldı`);
+  if (isMobile()) closeDrawers();
+}
+function deleteSaved(btn, id) {
+  if (btn.dataset.confirm !== '1') {
+    btn.dataset.confirm = '1'; btn.classList.add('btn', 'sm'); btn.classList.remove('icon-btn'); btn.textContent = 'Emin misiniz?'; btn.style.color = 'var(--vhard)';
+    setTimeout(() => { if (btn.isConnected) renderSaved(); }, 3500); return;
+  }
+  const list = loadSavedList().filter(r => r.id !== id);
+  store.set(KEY, JSON.stringify(list));
+  if (currentRouteId === id) currentRouteId = null;
+  renderSaved(); toast('Kayıtlı rota silindi');
+}
+function loadSample() {
+  currentRouteId = null;
+  applyRoute({ name: SAMPLE.name, vehicle: SAMPLE.vehicle, dwell: SAMPLE.dwell, points: SAMPLE.pts.map(([lo, la]) => { const w = toWorld(lo, la); const poi = POIS.find(p => Math.hypot(p.x - w.x, p.y - w.y) < 2); return { ...w, name: poi?.name, poiId: poi?.id }; }) });
+  toast('Örnek rota yüklendi: Jezero Krateri’nden Isidis’e');
+}
+// dışa aktarma
+let fmt = 'geojson';
+function exportText() {
+  const name = $('#routeName').value.trim() || 'Adsız rota';
+  const pts = state.points.map((p, i) => { const ll = toLL(p.x, p.y); return { sira: i + 1, rol: roleName(role(i, state.points.length)), ad: pointName(p), enlem: +ll.lat.toFixed(4), boylam: +ll.lon.toFixed(4), yukselti_m: Math.round(elevM(sampleH(p.x, p.y).h)) }; });
+  if (fmt === 'csv') return 'sira,rol,ad,enlem,boylam,yukselti_m\n' + pts.map(p => [p.sira, p.rol, `"${p.ad.replace(/"/g, '""')}"`, p.enlem, p.boylam, p.yukselti_m].join(',')).join('\n');
+  if (fmt === 'json') return JSON.stringify({ ad: name, olusturma: new Date().toISOString(), arac: stats.veh.name, rota_yontemi: state.pathMode === 'terrain' ? 'arazi uyumlu' : 'düz hat', rota_yaklasimi: ROUTE_STRATEGIES[state.routeStrategy].name, ozet: { mesafe_km: Math.round(stats.total), sure_sol: +stats.sols.toFixed(1), enerji_kwh: Math.round(stats.energy), arazi_zorlugu: diffLabel(stats.dAvg).t }, duraklar: pts, not: 'Temsili yüzey modeli; bilimsel veri değildir.' }, null, 2);
+  return JSON.stringify({ type: 'FeatureCollection', properties: { name, body: 'Mars', crs: 'Mars 2000 planetocentric (temsili)', route_strategy: ROUTE_STRATEGIES[state.routeStrategy].name }, features: [
+    { type: 'Feature', properties: { name, distance_km: Math.round(stats.total) }, geometry: { type: 'LineString', coordinates: stats.paths.flatMap((pp, i) => i ? pp.slice(1) : pp).map(q => { const l = toLL(q.x, q.y); return [+l.lon.toFixed(4), +l.lat.toFixed(4)]; }) } },
+    ...pts.map(p => ({ type: 'Feature', properties: { order: p.sira, role: p.rol, name: p.ad }, geometry: { type: 'Point', coordinates: [p.boylam, p.enlem] } }))] }, null, 2);
+}
+function refreshExport() {
+  $('#exportText').value = exportText();
+  $$('#exportDlg [role="tab"]').forEach(t => t.setAttribute('aria-selected', String(t.dataset.fmt === fmt)));
+}
+$('#exportBtn').onclick = () => {
+  if (!stats) { toast('Dışa aktarmak için önce bir rota oluşturun (en az iki nokta)', { type: 'error' }); return; }
+  $('#exportMeta').innerHTML = `<span>${esc($('#routeName').value.trim() || 'Adsız rota')}</span><span>${nf0.format(stats.total)} km</span>`;
+  refreshExport(); $('#exportDlg').showModal();
+};
+$$('#exportDlg [role="tab"]').forEach(t => t.onclick = () => { fmt = t.dataset.fmt; refreshExport(); });
+$('#copyExport').onclick = async () => {
+  const txt = $('#exportText').value;
+  try { await navigator.clipboard.writeText(txt); toast('Rota panoya kopyalandı', { type: 'ok' }); }
+  catch (e) { const ta = $('#exportText'); ta.focus(); ta.select(); toast('Otomatik kopyalama engellendi; metin seçildi, Ctrl+C ile kopyalayın', { type: 'error' }); }
+};
+
+/* =========================================================
+   Diyaloglar, çekmeceler, bildirimler
+   ========================================================= */
+$$('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+$$('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close(); }));
+const helpDlg = $('#helpDlg');
+helpDlg.addEventListener('close', () => store.set('marsRotaPlanlayici.seen', '1'));
+$('#helpBtn').onclick = () => helpDlg.showModal();
+$('#loadSample').onclick = () => { helpDlg.close(); loadSample(); };
+$('#profileBtn').onclick = e => { const p = $('#profilePop'); p.hidden = !p.hidden; e.currentTarget.setAttribute('aria-expanded', String(!p.hidden)); };
+document.addEventListener('click', e => { if (!e.target.closest('#profilePop,#profileBtn')) { $('#profilePop').hidden = true; $('#profileBtn').setAttribute('aria-expanded', 'false'); } });
+$('#popHelp').onclick = () => { $('#profilePop').hidden = true; helpDlg.showModal(); };
+$('#popSaved').onclick = () => { $('#profilePop').hidden = true; if (isMobile()) openDrawer('left'); $('#hSave').scrollIntoView({ behavior: 'smooth', block: 'start' }); $('#savedList').querySelector('button')?.focus(); };
+
+const isMobile = () => matchMedia('(max-width:980px)').matches;
+function openDrawer(side) {
+  document.body.classList.remove('open-left', 'open-right');
+  document.body.classList.add('open-' + side);
+  $('#openLeft').setAttribute('aria-expanded', String(side === 'left'));
+  $('#openRight').setAttribute('aria-expanded', String(side === 'right'));
+}
+function closeDrawers() { document.body.classList.remove('open-left', 'open-right'); $('#openLeft').setAttribute('aria-expanded', 'false'); $('#openRight').setAttribute('aria-expanded', 'false'); }
+$('#openLeft').onclick = () => document.body.classList.contains('open-left') ? closeDrawers() : openDrawer('left');
+$('#openRight').onclick = () => document.body.classList.contains('open-right') ? closeDrawers() : openDrawer('right');
+$('#backdrop').onclick = closeDrawers;
+
+function toast(msg, { type = '', action, fn } = {}) {
+  const t = document.createElement('div'); t.className = 'toast ' + type; t.setAttribute('role', type === 'error' ? 'alert' : 'status');
+  t.innerHTML = `<span>${esc(msg)}</span>`;
+  if (action) { const b = document.createElement('button'); b.className = 'btn sm'; b.textContent = action; b.onclick = () => { fn(); t.remove(); }; t.appendChild(b); }
+  $('#toasts').appendChild(t);
+  while ($('#toasts').children.length > 2) $('#toasts').firstChild.remove();
+  setTimeout(() => t.remove(), action ? 6000 : 3200);
+}
+let annT = 0;
+function announce(msg) { const a = $('#mapHintText'); clearTimeout(annT); a.setAttribute('aria-label', msg); annT = setTimeout(() => a.removeAttribute('aria-label'), 1500); toastQuiet(msg); }
+function toastQuiet(msg) { let sr = $('#srLive'); if (!sr) { sr = document.createElement('div'); sr.id = 'srLive'; sr.className = 'sr-only'; sr.setAttribute('aria-live', 'polite'); document.body.appendChild(sr); } sr.textContent = msg; }
+
+/* =========================================================
+   Başlatma, yükleme ve hata durumları
+   ========================================================= */
+function showError(err) {
+  $('#loadingState').hidden = true;
+  $('#errorState').hidden = false;
+  if (err?.message) $('#errorMsg').textContent = 'Yüzey modeli oluşturulamadı: ' + err.message + ' Rotanız etkilenmedi.';
+}
+async function boot({ simulateError = false, slow = false } = {}) {
+  state.ready = false;
+  $('#errorState').hidden = true; $('#loadingState').hidden = false;
+  const bar = $('#progressBar'), txt = $('#progressText');
+  try {
+    await generateTerrain(async p => {
+      bar.style.width = (p * 100).toFixed(0) + '%'; txt.textContent = '%' + (p * 100).toFixed(0);
+      if (slow) await new Promise(r => setTimeout(r, 150));
+      if (simulateError && p > 0.55) throw new Error('Örnek hata: yükseklik verisi okunamadı.');
+    });
+  } catch (err) { showError(err); return; }
+  $('#loadingState').hidden = true;
+  state.ready = true;
+  measure(); state.view.k = minK; clampView();
+  routeChanged();
+  if (state.points.length) fitRoute();
+  if (store.get('marsRotaPlanlayici.seen') !== '1' && !location.hash) helpDlg.showModal();
+}
+$('#retryBtn').onclick = () => boot();
+window.addEventListener('resize', () => { if (!state.ready) return; const oldMin = minK; const atMin = Math.abs(state.view.k - oldMin) < 1e-6; measure(); if (atMin) state.view.k = minK; clampView(); render(); if (!isMobile()) closeDrawers(); });
+
+renderChips(); renderPoints(); renderSummary(); renderSaved(); updateHint();
+$('#vehicleNote').textContent = VEHICLES[0].note;
+// Durum ekranlarını önizlemek için: #durum-hata veya #durum-yukleme
+const hash = location.hash.replace('#', '');
+boot({ simulateError: hash === 'durum-hata', slow: hash === 'durum-yukleme' });
+})();
+</script>
+<script src="/planner.js" defer></script>
+</body>
+</html>

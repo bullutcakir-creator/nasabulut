@@ -1,0 +1,12 @@
+{
+  "name": "nasa-express-app",
+  "version": "1.0.0",
+  "description": "A minimal Express.js application",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

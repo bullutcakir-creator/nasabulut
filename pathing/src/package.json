@@ -1,0 +1,16 @@
+{
+  "name": "martian-map-prototype",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Interplanetary Survival Guide: Martian Map - Jezero walking-route prototype (Express server + route engine)",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test tests/*.test.js",
+    "prepare-data": "./.venv/bin/python -I prepare_data.py"
+  },
+  "dependencies": {
+    "express": "4.21.2"
+  }
+}

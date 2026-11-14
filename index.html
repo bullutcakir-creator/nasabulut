@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mars Gezgini: Jezero Rota Haritası</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#171717; --bg2:#1d1d1d; --panel:#202020; --panel2:#292929; --line:#3a3a3a;
+  --text:#ededed; --muted:#b8b8b8; --dim:#888;
+  --accent:#e5a84b; --safe:#69d7e8; --short:#ffd27a; --danger:#ff5a5a; --ok:#7dff9b; --rock:#b9a2ff; --sand:#f0d070;
+  --mono:'JetBrains Mono',ui-monospace,monospace; --sans:'Space Grotesk',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.55}
+.wrap{max-width:1260px;margin:0 auto;padding:0 20px}
+header.hero{padding:12px 0;border-bottom:1px solid var(--line);background:var(--bg)}
+.kicker{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:30px;line-height:1.1;margin:7px 0 5px}
+h1 span{color:var(--safe)}
+.lead{max-width:800px;color:var(--muted);font-size:17px;margin:0}
+h2{font-size:25px;margin:0 0 6px;letter-spacing:-.01em}
+h3{font-size:16.5px;margin:0 0 6px}
+.sub{color:var(--muted);margin:0 0 18px;max-width:820px}
+section{padding:34px 0;border-top:1px solid var(--line)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:12px}
+.btn{background:var(--panel2);border:1px solid var(--line);color:var(--text);font:500 13px var(--sans);padding:6px 10px;border-radius:2px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.4;cursor:default;border-color:var(--line)}
+
+/* map + side */
+.main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px;margin:10px 0 16px;align-items:start}
+@media (max-width:1000px){.main{grid-template-columns:1fr}}
+.mapcard{padding:10px}
+.maptools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:4px 4px 10px}
+.seg{display:inline-flex;background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:3px}
+.seg button{background:none;border:0;color:var(--muted);font:500 13px var(--sans);padding:6px 11px;border-radius:7px;cursor:pointer}
+.seg button.on{background:var(--panel2);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
+.mapbox{position:relative;aspect-ratio:1/1;border:1px solid var(--line);border-radius:2px;overflow:hidden;background:#050607}
+.mapbox #globe{position:absolute;inset:0;display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.mapbox #globe:active{cursor:grabbing}
+#scale{position:absolute;left:14px;bottom:14px;pointer-events:none;color:#fff;text-shadow:0 1px 3px #000;font:11px var(--mono)}
+#scale .bar{height:5px;border:1px solid #fff;border-top:0;margin-top:3px;box-shadow:0 1px 2px #000}
+#guide{margin:0 0 7px;background:transparent;border-left:2px solid var(--accent);padding:5px 9px;font-size:13px;line-height:1.35}
+#guide b{color:var(--accent)}
+#tip{position:absolute;pointer-events:none;background:rgba(13,9,7,.94);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:12px/1.45 var(--mono);display:none;white-space:nowrap;z-index:3}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:10px 4px 2px;font-size:12.5px;color:var(--muted)}
+.legend .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
+.legend .grad{display:inline-block;width:110px;height:9px;border-radius:3px;vertical-align:middle;margin:0 6px}
+.hint{font-size:12.5px;color:var(--dim);padding:6px 4px 0}
+.side{display:flex;flex-direction:column;gap:14px}
+.secondary-content{display:none}
+.presets{display:flex;gap:6px;margin:8px 0 14px}
+.presets .btn{flex:1;padding:6px 4px;font-size:12.5px}
+.presets .btn.on{border-color:var(--accent);color:var(--accent)}
+.ctrl{margin-bottom:13px}
+.ctrl label{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:3px}
+.ctrl label b{font:600 13px var(--mono);color:var(--accent)}
+.ctrl small{display:block;color:var(--dim);font-size:12px;line-height:1.4;margin-top:2px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.stats{display:grid;grid-template-columns:minmax(0,1fr) auto;font-size:12.5px}
+.stats div{padding:6px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
+.stats .h{font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em;text-align:right}
+.stats .v{font-family:var(--mono);text-align:right;font-size:12px}
+.stats .c1{color:var(--safe)} .stats .c2{color:var(--short)} .stats .c3{color:#d8c7ba}
+.stats .bad{color:var(--danger)} .stats .good{color:var(--ok)}
+.note{font-size:13px;color:var(--muted)}
+.warnbox{display:none;margin-top:10px;padding:10px;border-radius:9px;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.4);font-size:13px}
+
+/* charts */
+.charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:860px){.charts{grid-template-columns:1fr}}
+.chart canvas{width:100%;height:200px;display:block}
+.chart .cap{display:flex;flex-wrap:wrap;gap:4px 12px;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+#readout{font:12.5px var(--mono);color:var(--muted);margin-top:10px;min-height:20px}
+
+/* why */
+.why{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px}
+@media (max-width:860px){.why{grid-template-columns:1fr}}
+#reasons{list-style:none;margin:0;padding:0;counter-reset:r}
+#reasons li{position:relative;padding:12px 14px 12px 48px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--panel);font-size:14.5px;color:#e8d9cc}
+#reasons li b{color:var(--text)}
+#reasons li::before{counter-increment:r;content:counter(r);position:absolute;left:12px;top:12px;width:25px;height:25px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);font:600 12px/23px var(--mono);text-align:center;color:var(--accent)}
+.formula{font:13px var(--mono);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin:8px 0;overflow-x:auto}
+
+/* physics + lessons */
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:960px){.grid3{grid-template-columns:1fr 1fr}}
+@media (max-width:680px){.grid3,.grid2{grid-template-columns:1fr}}
+.fcard{font-size:14px;color:#e2d2c5}
+.fcard .tag{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.fcard p{margin:6px 0}
+.fcard ul{margin:4px 0;padding-left:18px}
+.fcard .mars{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);color:var(--short);font-size:13px}
+.fcard .mars b{color:var(--accent)}
+.full{grid-column:1/-1}
+.calc{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:14px}
+@media (max-width:760px){.calc{grid-template-columns:1fr}}
+.calc select{width:100%;margin-top:4px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:7px;padding:7px;font:13px var(--sans)}
+.bar{margin-bottom:11px;font-size:13px}
+.bar .top{display:flex;justify-content:space-between;margin-bottom:3px}
+.bar .top b{font:600 13px var(--mono)}
+.bar .track{height:11px;background:var(--bg2);border-radius:6px;overflow:hidden}
+.bar .fill{height:100%;border-radius:6px;transition:width .2s}
+footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Jezero · rota planlama</div>
+    <h1>Mars gezgini <span>rota haritası</span></h1>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="main">
+    <div class="card mapcard">
+      <div class="maptools">
+        <div class="seg" id="layers">
+          <button data-l="elev" class="on">Yükseklik</button>
+          <button data-l="slope">Eğim</button>
+          <button data-l="haz">Tehlike</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="seg" id="range">
+            <button data-range="jezero" class="on">Jezero</button>
+            <button data-range="mars">Mars</button>
+          </div>
+          <button class="btn" id="setA" title="İmlecin son bulunduğu arazi noktasını başlangıç yap">A'yı koy</button>
+          <button class="btn" id="setB" title="İmlecin son bulunduğu arazi noktasını varış yap">B'yi koy</button>
+          <button class="btn" id="clear">Temizle</button>
+          <button class="btn" id="swap">A ⇄ B</button>
+        </div>
+      </div>
+      <div id="guide"></div>
+      <div class="mapbox" id="mapbox">
+        <canvas id="globe" tabindex="0" aria-label="Mars küresi ve Jezero arazi haritası"></canvas>
+        <div id="scale"><span id="scaleLabel">--</span><div class="bar" id="scaleBar"></div></div>
+        <div id="tip"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+      <div class="hint">Arazi üzerinde imleci konumlandırıp A ile başlangıcı, B ile varışı işaretleyin. Küreyi sürükleyerek döndürebilirsiniz.</div>
+    </div>
+
+    <aside class="side">
+      <div class="card">
+        <h3>Rover rotası</h3>
+        <p class="note">Güvenli rota varsa seçilir. Yoksa en düşük riskli alternatif, tehlikeleriyle birlikte gösterilir.</p>
+        <button class="btn" id="calculate" style="width:100%;margin-top:14px">Hesapla</button>
+        <div class="warnbox" id="warn"></div>
+      </div>
+      <div class="card">
+        <h3>Rota özeti</h3>
+        <div class="stats" id="stats"></div>
+        <div class="note" style="margin-top:8px;font-size:12px">Eğim kaynağı: CTX 20 m + kısmi HiRISE 1 m. AI arazi değerlerini üretmez.</div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<section>
+  <div class="wrap">
+    <h2>Rota profili</h2>
+    <p class="sub">Rota boyunca yükseklik ve eğim. Grafiğin üzerinde gezinince haritada o nokta işaretlenir.</p>
+    <div class="charts">
+      <div class="card chart">
+        <div class="cap"><span>Yükseklik (m, göreli)</span><span><span style="color:var(--safe)">━</span> Rover rotası</span></div>
+        <canvas id="chElev"></canvas>
+      </div>
+      <div class="card chart">
+        <div class="cap"><span>Eğim (°)</span><span><span style="color:var(--safe)">━</span> Rover rotası</span></div>
+        <canvas id="chSlope"></canvas>
+      </div>
+    </div>
+    <div id="readout"></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap why">
+    <div>
+      <h2>Bu rota neden seçildi?</h2>
+      <p class="sub">Özet, gerçek arazi metrikleri ve hesaplanan rota üzerinden hazırlanır.</p>
+      <ol id="reasons"></ol>
+    </div>
+    <div>
+      <div class="card">
+        <h3>Veri ve yöntem</h3>
+        <p class="note">Rota motoru gerçek CTX ve HiRISE türetilmiş arazi hücrelerini kullanır. Model eğim veya yükseklik üretmez.</p>
+        <p class="note">AI rotayı değiştirmez; yalnızca doğrulanmış metrikleri Türkçe bir rota özeti ve navigasyon önerisine dönüştürür.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secondary-content">
+  <div class="wrap">
+    <h2>Bir aracın aldığı yolu neler etkiler?</h2>
+    <p class="sub">Eğimli arazide ilerleyen bir aracın ne kadar yol alacağını belirleyen etkenler ve her birinin Mars'ta nasıl değiştiği.</p>
+    <div class="grid2">
+      <div class="card fcard"><div class="tag">01 · İlk hız (v₀)</div>
+        <p>En etkili faktör budur. Alınan yol hızın karesiyle artar: hız iki katına çıkarsa yol yaklaşık dört katına çıkar.</p>
+        <div class="mars"><b>Mars'ta:</b> Gezginler çok yavaştır; Perseverance'ın azami hızı saatte yaklaşık 150 metredir. Bu hızda araç neredeyse anında durur.</div></div>
+      <div class="card fcard"><div class="tag">02 · Eğim açısı (θ)</div>
+        <p>Rampa dikleştikçe yer çekiminin yola paralel bileşeni (mg·sinθ) büyür.</p>
+        <ul><li>Yukarı çıkan araç daha çabuk yavaşlar, daha kısa yol alır.</li><li>Aşağı inen araç daha hızlı ivmelenir.</li></ul>
+        <div class="mars"><b>Mars'ta:</b> Curiosity ve Perseverance 45°'lik yatmaya devrilmeden dayanacak biçimde tasarlandı, ama sürücüler 30°'den dik eğimlerden kaçınır. Bu simülasyonun varsayılan sınırı daha da temkinli: 20°.</div></div>
+      <div class="card fcard"><div class="tag">03 · Sürtünme katsayısı (μ)</div>
+        <p>Yolun yüzeyine (asfalt, buz, toprak) ve lastiklerin durumuna bağlıdır. Sürtünme kuvveti μ·mg·cosθ olduğundan sürtünme arttıkça alınan yol kısalır.</p>
+        <div class="mars"><b>Mars'ta:</b> Yüzey gevşek kum, toz ve kayadan oluşur. Yumuşak kumda tekerlekler patinaj yapar; haritadaki sarı alanlar bu yüzden cezalıdır.</div></div>
+      <div class="card fcard"><div class="tag">04 · Yer çekimi ivmesi (g)</div>
+        <p>Dünya'da yaklaşık 9,8 m/s²'dir. Yer çekimi azaldıkça aynı rampada araç daha uzağa gider.</p>
+        <div class="mars"><b>Mars'ta:</b> g ≈ 3,72 m/s². Aynı hız ve aynı rampada araç Dünya'dakinin yaklaşık 2,6 katı yol alır; Ay'da (1,62 m/s²) bu oran yaklaşık 6 kattır. Fren mesafesi de aynı oranda uzar.</div></div>
+      <div class="card fcard"><div class="tag">05 · Hava direnci</div>
+        <p>Hız, aracın şekli (aerodinamik yapısı) ve ön yüzey alanı arttıkça etkisi büyür.</p>
+        <div class="mars"><b>Mars'ta:</b> Atmosfer yoğunluğu Dünya'nınkinin yaklaşık %1,6'sıdır; aynı hızda hava direnci 60 kat kadar küçüktür ve gezgin hızlarında yok sayılır.</div></div>
+      <div class="card fcard"><div class="tag">06 · Yuvarlanma direnci</div>
+        <p>Lastik basıncına, lastik tipine ve aracın ağırlığına bağlıdır.</p>
+        <div class="mars"><b>Mars'ta:</b> Gezginlerde havalı lastik yoktur; Curiosity ve Perseverance alüminyum tekerlek kullanır. Tekerlek yumuşak zemine gömüldükçe yuvarlanma direnci hızla artar.</div></div>
+      <div class="card fcard"><div class="tag">07 · Motor gücü ve fren</div>
+        <p>Araç motorla itiliyorsa ya da fren yapıyorsa bunlar da alınan yolu doğrudan belirler.</p>
+        <div class="mars"><b>Mars'ta:</b> Gezginler elektrik motorlarıyla sürülür. Curiosity ve Perseverance'ın radyoizotop jeneratörü yaklaşık 110 W üretir; güç sınırlı olduğu için her tırmanışın enerji bedeli önemlidir.</div></div>
+      <div class="card fcard" style="border-color:#5a3a22"><div class="tag">Kütle hakkında not</div>
+        <p>İdeal durumda, yani hava direnci yokken kütle alınan yolu etkilemez. Hem yer çekimi hem sürtünme kütleyle orantılı olduğu için kütle denklemde sadeleşir.</p>
+        <div class="mars"><b>Mars'ta:</b> Hava direnci neredeyse sıfır olduğundan bu ideal durum Mars'ta Dünya'dakinden daha iyi geçerlidir.</div></div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
+      <h3>Durma mesafesi hesaplayıcı</h3>
+      <p class="note" style="margin:0">Aynı araç, aynı hız ve aynı eğimde Mars'ta, Dünya'da ve Ay'da durana kadar ne kadar yol alır?</p>
+      <div class="calc">
+        <div>
+          <div class="ctrl"><label>İlk hız (v₀) <b id="cVv"></b></label><input type="range" id="cV" min="0.5" max="30" step="0.5" value="5"></div>
+          <div class="ctrl"><label>Eğim açısı (θ) <b id="cTv"></b></label><input type="range" id="cT" min="0" max="40" step="0.5" value="10"></div>
+          <div class="ctrl"><label>Sürtünme katsayısı (μ) <b id="cMuv"></b></label><input type="range" id="cMu" min="0.05" max="1" step="0.05" value="0.5"></div>
+          <div class="ctrl"><label>Yön</label><select id="cDir"><option value="up">Yokuş yukarı (motor kapalı, frenli)</option><option value="down">Yokuş aşağı (frenleyerek)</option></select></div>
+          <button class="btn" id="cRoute">Rotadaki en dik eğimi kullan</button>
+        </div>
+        <div>
+          <div id="cBars"></div>
+          <div class="note" id="cOut"></div>
+          <div class="formula" id="cFormula" style="color:var(--short)"></div>
+          <div class="note" style="font-size:12px">Hesap hava ve yuvarlanma direncini yok sayar; μ, frenleme sırasındaki etkin sürtünme katsayısıdır. Kütle sadeleştiği için sonuca girmez.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="secondary-content">
+  <div class="wrap">
+    <h2>Gerçek görevlerden dersler</h2>
+    <p class="sub">Simülasyondaki cezaların her biri, Mars'ta gerçekten yaşanmış bir sorundan geliyor.</p>
+    <div class="grid3">
+      <div class="card fcard"><div class="tag">Yan eğim</div><h3>Yokuş yukarı ile yamaç boyunca aynı şey değil</h3>
+        <p>Aynı yamaçta gezgin <b>düz yukarı</b> çıkarsa tekerlekler kayar ve enerji artar, ama devrilme riski düşüktür. <b>Yamaç boyunca yan</b> giderse gövde yana yatar; devrilme ve yana kayma riski büyür.</p>
+        <p>Algoritma bu yüzden eğimi hareket yönündeki ve yanal bileşen olarak ikiye ayırıp ayrı ayrı cezalandırır.</p>
+        <div class="formula">ileri = g·u &nbsp; yanal = |g × u|</div></div>
+      <div class="card fcard"><div class="tag">Yumuşak kum</div><h3>Düz ama tehlikeli</h3>
+        <p>Kum alanları neredeyse düzdür, yani eğim haritasında zararsız görünür. Ama tekerlekler gömülebilir.</p>
+        <p>Opportunity 2005'te “Purgatory” adlı kum dalgasına saplandı ve ancak yaklaşık beş haftada kurtarıldı. Spirit 2009'da “Troy” bölgesinde yumuşak toprağa saplandı; kurtarılamadı ve 2010'da iletişim kesildi.</p></div>
+      <div class="card fcard"><div class="tag">Kayalar</div><h3>Tekerlek hasarı</h3>
+        <p>Keskin kayalar tekerlekleri deler; büyük kayalar gövdenin altına takılır. Curiosity'nin alüminyum tekerleklerinde 2013'te beklenenden hızlı delik ve yırtıklar görülünce ekip rotaları daha yumuşak zeminlerden geçirmeye başladı.</p>
+        <p>Kaya yoğunluğu en çok <b>krater kenarlarında</b> (çarpmayla saçılan parçalar) ve dik sırt yamaçlarında yüksektir.</p></div>
+      <div class="card fcard"><div class="tag">Haritalama</div><h3>Yörüngeden yükseklik modeli</h3>
+        <p>Mars Reconnaissance Orbiter'daki HiRISE kamerası yüzeyi piksel başına yaklaşık 25–30 cm ayrıntıyla görüntüler. İki farklı açıdan çekilen görüntülerden <b>sayısal yükseklik modeli</b> üretilir; eğim ve tehlike haritaları bu modelden çıkarılır.</p></div>
+      <div class="card fcard"><div class="tag">Otonomi</div><h3>Yerde kendi kararını veren gezgin</h3>
+        <p>Dünya'daki ekip uzun rotayı yörünge haritalarıyla planlar. Perseverance ise AutoNav sistemiyle önündeki araziyi kendi kameralarıyla görür ve yakın engellerden sürüş sırasında kendisi kaçınır.</p></div>
+      <div class="card fcard"><div class="tag">Bu sayfa</div><h3>Basitleştirilmiş bir model</h3>
+        <p>Bu örnekte rota, simüle arazi verileriyle bir AI modelinden istenir. Gerçek planlamada güneş açısı, iletişim pencereleri, araç durumu ve bilimsel hedefler de hesaba girer; model çıktısı görev güvenliği için tek başına yeterli değildir.</p></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">Jezero çalışma alanı · CTX DEM ve kısmi HiRISE türetilmiş eğim verisi. Rotalar görev planlaması yerine geçmez.</div>
+</footer>
+
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+(()=>{
+"use strict";
+const W=176, H=176, DEG=180/Math.PI, MARS_RADIUS_M=3396190;
+const $=id=>document.getElementById(id);
+const canvas=$('globe'), P={limit:20};
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:false});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
+renderer.setSize(880,880,false); renderer.outputColorSpace=THREE.SRGBColorSpace;
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x050607);
+const camera=new THREE.PerspectiveCamera(36,1,0.0001,20);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enablePan=false; controls.enableDamping=true; controls.dampingFactor=0.06;
+controls.minDistance=1.00015; controls.maxDistance=5;
+const ambient=new THREE.AmbientLight(0xffffff,0.8); scene.add(ambient);
+const sun=new THREE.DirectionalLight(0xffffff,2.1); sun.position.set(-2,3,4); scene.add(sun);
+const globeGroup=new THREE.Group(); scene.add(globeGroup);
+const sphere=new THREE.Mesh(new THREE.SphereGeometry(1,160,96),new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,metalness:0}));
+globeGroup.add(sphere);
+const overlayGroup=new THREE.Group(); globeGroup.add(overlayGroup);
+const hoverMesh=new THREE.Mesh(new THREE.SphereGeometry(0.00014,12,10),new THREE.MeshBasicMaterial({color:0xffffff}));
+hoverMesh.visible=false;globeGroup.add(hoverMesh);
+const raycaster=new THREE.Raycaster(), pointerNdc=new THREE.Vector2();
+const offscreen=document.createElement('canvas'), tileContext=offscreen.getContext('2d');
+const tileTexture=new THREE.CanvasTexture(offscreen); tileTexture.colorSpace=THREE.SRGBColorSpace;
+let terrainMesh=null, terrainImage=null, rangeMode='jezero', layer='elev';
+let T={h:new Float32Array(W*H),hMax:1,slope:new Float32Array(W*H),rock:new Float32Array(W*H),sand:new Float32Array(W*H)};
+let A=null, B=null, example=false, safe=null, routeLoading=false, routeError='';
+let terrainReady=false, hoverPoint=null, selectionPoint=null, hoverX=null, press=null, drag=null;
+
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const fm=v=>Math.round(v).toLocaleString('tr-TR');
+const f1=v=>v.toLocaleString('tr-TR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const colorStops=[[0,[23,58,74]],[0.16,[20,125,130]],[0.36,[98,170,104]],[0.58,[209,198,76]],[0.8,[229,138,61]],[1,[255,240,176]]];
+function colorRamp(value){
+  const t=clamp(value,0,1);
+  for(let i=1;i<colorStops.length;i++) if(t<=colorStops[i][0]){
+    const [t0,c0]=colorStops[i-1],[t1,c1]=colorStops[i],f=(t-t0)/(t1-t0);
+    return c0.map((value,index)=>Math.round(value+(c1[index]-value)*f));
+  }
+  return colorStops.at(-1)[1];
+}
+function geoVector(lon,lat,radius=1){
+  const lambda=lon/DEG, phi=lat/DEG, c=Math.cos(phi);
+  return new THREE.Vector3(c*Math.sin(lambda),Math.sin(phi),c*Math.cos(lambda)).multiplyScalar(radius);
+}
+function pointToGeo(point){
+  return {
+    lon:T.bounds.west+(point.x+0.5)/W*(T.bounds.east-T.bounds.west),
+    lat:T.bounds.north-(point.y+0.5)/H*(T.bounds.north-T.bounds.south)
+  };
+}
+function geoToPoint(lon,lat){
+  const x=(lon-T.bounds.west)/(T.bounds.east-T.bounds.west)*W-0.5;
+  const y=(T.bounds.north-lat)/(T.bounds.north-T.bounds.south)*H-0.5;
+  if(x< -0.5||x>W-0.5||y< -0.5||y>H-0.5) return null;
+  return {x:clamp(Math.round(x),0,W-1),y:clamp(Math.round(y),0,H-1)};
+}
+function loadGlobeTexture(){
+  new THREE.TextureLoader().load('/image.png',texture=>{
+    terrainImage=texture;
+    terrainImage.colorSpace=THREE.SRGBColorSpace;
+    terrainImage.wrapS=THREE.RepeatWrapping;
+    terrainImage.offset.x=0.25;
+    terrainImage.anisotropy=renderer.capabilities.getMaxAnisotropy();
+    terrainImage.needsUpdate=true;
+    sphere.material.map=terrainImage; sphere.material.needsUpdate=true;
+  },undefined,error=>{console.error('Mars globe texture failed to load',error);});
+}
+function setCamera(distance){
+  const direction=geoVector(77.69,18.41).normalize();
+  camera.position.copy(direction.multiplyScalar(distance)); camera.up.set(0,1,0);
+  controls.target.set(0,0,0); controls.update();
+}
+function resizeGlobe(){
+  const rect=canvas.getBoundingClientRect();
+  if(!rect.width||!rect.height) return;
+  renderer.setSize(rect.width,rect.height,false);
+  camera.aspect=rect.width/rect.height; camera.updateProjectionMatrix();
+  updateScale();
+}
+function updateScale(){
+  const rect=canvas.getBoundingClientRect();
+  if(!rect.height)return;
+  const pixels=100, altitude=Math.max(camera.position.length()-1,0.00001);
+  const metres=2*altitude*Math.tan(camera.fov/2/DEG)*(pixels/rect.height)*MARS_RADIUS_M;
+  const exponent=Math.floor(Math.log10(metres)),base=metres/10**exponent;
+  const nice=base<1.5?1:base<3.5?2:base<7.5?5:10;
+  const scaleMetres=nice*10**exponent;
+  const width=pixels*scaleMetres/metres;
+  const label=scaleMetres>=1000?`${fm(scaleMetres/1000)} km`:`${fm(scaleMetres)} m`;
+  $('scaleLabel').textContent=label;
+  $('scaleBar').style.width=`${width}px`;
+}
+function animateGlobe(){requestAnimationFrame(animateGlobe);controls.update();renderer.render(scene,camera);}
+controls.addEventListener('change',updateScale);
+
+function renderLegend(){
+  const common='<span><span class="sw" style="background:var(--safe)"></span>Hesaplanan rota</span><span>Jezero veri alanında nokta seçimi</span>';
+  const detail=layer==='slope'
+    ? `<span>Yeşil → kırmızı eğim · kırmızı alanlar &gt; ${P.limit}°</span>`
+    : layer==='haz' ? '<span>Kırmızı alanlar rover için geçilemez eğim</span>'
+      : '<span>Alçak <span class="grad" style="background:linear-gradient(90deg,#173a4a,#147d82,#62aa68,#d1c64c,#e58a3d,#fff0b0)"></span>Yüksek · CTX/HiRISE</span>';
+  $('legend').innerHTML=detail+common;
+}
+function renderTerrainTexture(){
+  if(!T.renderH||!T.renderSlope) return;
+  const width=T.renderWidth,height=T.renderHeight;
+  offscreen.width=width; offscreen.height=height;
+  const image=tileContext.createImageData(width,height), pixels=image.data;
+  for(let i=0;i<T.renderH.length;i++){
+    const x=i%width,y=Math.floor(i/width);
+    const elevation=T.renderH[i]/Math.max(T.hMax,1), slope=T.renderSlope[i];
+    let rgb;
+    if(layer==='slope'){
+      const t=clamp(slope/P.limit,0,1);
+      rgb=[Math.round(45+190*t),Math.round(158-120*t),Math.round(107-65*t)];
+      if(slope>P.limit) rgb=[226,48,42];
+    }else if(layer==='haz'){
+      rgb=colorRamp(elevation);
+      if(slope>P.limit) rgb=[235,45,38];
+    }else rgb=colorRamp(elevation);
+    const edgeDistance=Math.min(x,y,width-1-x,height-1-y);
+    const edge=clamp(edgeDistance/(Math.min(width,height)*0.045),0,1);
+    const alpha=edge*edge*(3-2*edge);
+    const offset=i*4; pixels[offset]=rgb[0]; pixels[offset+1]=rgb[1]; pixels[offset+2]=rgb[2]; pixels[offset+3]=Math.round(alpha*255);
+  }
+  tileContext.putImageData(image,0,0); tileTexture.needsUpdate=true;
+  renderLegend();
+}
+function buildTerrainMesh(){
+  if(terrainMesh){globeGroup.remove(terrainMesh);terrainMesh.geometry.dispose();terrainMesh.material.dispose();}
+  const rows=96,cols=96,positions=[],uvs=[],indices=[];
+  for(let row=0;row<=rows;row++){
+    const v=row/rows, lat=T.bounds.north-v*(T.bounds.north-T.bounds.south);
+    for(let col=0;col<=cols;col++){
+      const u=col/cols,lon=T.bounds.west+u*(T.bounds.east-T.bounds.west);
+      const x=Math.round(v*(T.renderHeight-1))*T.renderWidth+Math.round(u*(T.renderWidth-1));
+      const elevation=T.renderH[x]||0;
+      const radius=1+(elevation-T.hMin)/MARS_RADIUS_M+0.00012;
+      const point=geoVector(lon,lat,radius);
+      positions.push(point.x,point.y,point.z); uvs.push(u,1-v);
+    }
+  }
+  for(let row=0;row<rows;row++) for(let col=0;col<cols;col++){
+    const a=row*(cols+1)+col,b=(row+1)*(cols+1)+col,c=a+1,d=b+1;
+    indices.push(a,b,c,c,b,d);
+  }
+  const geometry=new THREE.BufferGeometry();
+  geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+  geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));
+  geometry.setIndex(indices); geometry.computeVertexNormals();
+  const material=new THREE.MeshStandardMaterial({map:tileTexture,side:THREE.DoubleSide,transparent:true,depthWrite:false,roughness:1});
+  terrainMesh=new THREE.Mesh(geometry,material); terrainMesh.name='Jezero terrain coverage';
+  globeGroup.add(terrainMesh);
+}
+function routeSurfacePoint(point){
+  const {lon,lat}=pointToGeo(point);
+  const x=Math.round(point.x/(W-1)*(T.renderWidth-1));
+  const y=Math.round(point.y/(H-1)*(T.renderHeight-1));
+  const elevation=T.renderH[y*T.renderWidth+x]??T.hMin;
+  const radius=1+(elevation-T.hMin)/MARS_RADIUS_M+0.00018;
+  return geoVector(lon,lat,radius);
+}
+function addMarker(point,label,color){
+  const position=routeSurfacePoint(point);
+  const markerCanvas=document.createElement('canvas');markerCanvas.width=markerCanvas.height=64;
+  const context=markerCanvas.getContext('2d');
+  context.beginPath();context.arc(32,32,28,0,Math.PI*2);context.fillStyle=`#${color.toString(16).padStart(6,'0')}`;context.fill();
+  context.lineWidth=4;context.strokeStyle='#fff';context.stroke();context.fillStyle='#111';context.font='700 34px sans-serif';context.textAlign='center';context.textBaseline='middle';context.fillText(label,32,34);
+  const texture=new THREE.CanvasTexture(markerCanvas);texture.colorSpace=THREE.SRGBColorSpace;
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:true,depthWrite:false}));
+  sprite.position.copy(position.clone().normalize().multiplyScalar(position.length()+0.0002));
+  sprite.scale.setScalar(0.00055);overlayGroup.add(sprite);
+}
+function drawOverlay(){
+  while(overlayGroup.children.length){
+    const item=overlayGroup.children.pop(); overlayGroup.remove(item);
+    item.geometry?.dispose(); item.material?.map?.dispose(); item.material?.dispose();
+  }
+  if(safe?.points?.length>1){
+    const routePoints=safe.points.filter((point,index)=>index===0||point.x!==safe.points[index-1].x||point.y!==safe.points[index-1].y);
+    const points=routePoints.map(routeSurfacePoint);
+    const curve=new THREE.CatmullRomCurve3(points,false,'centripetal',0.15);
+    const smoothPoints=curve.getPoints(Math.min(1800,Math.max(180,points.length*4)));
+    for(const point of smoothPoints){
+      const direction=point.clone().normalize();
+      const lon=Math.atan2(direction.x,direction.z)*DEG,lat=Math.asin(clamp(direction.y,-1,1))*DEG;
+      const mapPoint=geoToPoint(lon,lat);
+      let radius=1.00018;
+      if(mapPoint){
+        const index=Math.round(mapPoint.y/(H-1)*(T.renderHeight-1))*T.renderWidth+Math.round(mapPoint.x/(W-1)*(T.renderWidth-1));
+        radius=1+(T.renderH[index]-T.hMin)/MARS_RADIUS_M+0.00018;
+      }
+      point.copy(direction.multiplyScalar(radius));
+    }
+    const renderedCurve=new THREE.CatmullRomCurve3(smoothPoints,false,'centripetal',0.15);
+    const geometry=new THREE.TubeGeometry(renderedCurve,Math.max(100,smoothPoints.length-1),0.000035,6,false);
+    const material=new THREE.MeshBasicMaterial({color:safe.fallback?0xff705e:0x69d7e8});
+    overlayGroup.add(new THREE.Mesh(geometry,material));
+  }
+  if(A) addMarker(A,'A',0x7dff9b);
+  if(B) addMarker(B,'B',0xff7a3d);
+}
+
+loadGlobeTexture(); setCamera(1.026); resizeGlobe(); animateGlobe();
+
+/* ---------- grafikler ---------- */
+function drawChart(cv,series,o){
+  const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=200;
+  cv.width=w*dpr; cv.height=h*dpr; const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
+  if(!series){ c.font='13px Space Grotesk, sans-serif'; c.fillStyle='#806e62'; c.textAlign='center'; c.fillText('Haritada iki nokta seçince burada görünür',w/2,h/2); cv._map=null; return; }
+  const L=44, R=10, Tp=10, Bt=26, pw=w-L-R, ph=h-Tp-Bt;
+  const X=v=>L+v/o.xMax*pw, Y=v=>Tp+ph-(v-o.yMin)/(o.yMax-o.yMin)*ph;
+  c.font='11px JetBrains Mono, monospace'; c.fillStyle='#806e62'; c.strokeStyle='#35261d'; c.lineWidth=1;
+  for(let k=0;k<=4;k++){ const v=o.yMin+(o.yMax-o.yMin)*k/4, y=Y(v); c.beginPath(); c.moveTo(L,y); c.lineTo(w-R,y); c.stroke(); c.textAlign='right'; c.fillText(Math.round(v)+(o.unit||''),L-6,y+4); }
+  const step=o.xMax>1400?400:o.xMax>700?200:o.xMax>300?100:50;
+  c.textAlign='center'; for(let v=0;v<=o.xMax;v+=step) c.fillText(v+' m',X(v),h-8);
+  if(o.limit!=null){
+    c.fillStyle='rgba(255,90,90,.08)'; c.fillRect(L,Tp,pw,Math.max(0,Y(o.limit)-Tp));
+    c.save(); c.setLineDash([6,5]); c.strokeStyle='#ff5a5a'; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,Y(o.limit)); c.lineTo(w-R,Y(o.limit)); c.stroke(); c.restore();
+  }
+  for(const s of series){
+    c.save(); if(s.dash) c.setLineDash(s.dash); c.strokeStyle=s.color; c.lineWidth=s.width||2; c.lineJoin='round';
+    c.beginPath(); for(let k=0;k<s.xs.length;k++){ const x=X(s.xs[k]), y=Y(clamp(s.ys[k],o.yMin,o.yMax)); k?c.lineTo(x,y):c.moveTo(x,y); } c.stroke(); c.restore();
+  }
+  if(o.hoverX!=null){ c.strokeStyle='rgba(255,255,255,.6)'; c.beginPath(); c.moveTo(X(o.hoverX),Tp); c.lineTo(X(o.hoverX),Tp+ph); c.stroke(); }
+  cv._map={L,pw,xMax:o.xMax};
+}
+function smooth(a,r){ const o=[]; for(let k=0;k<a.length;k++){ let s=0,n=0; for(let j=k-r;j<=k+r;j++) if(j>=0&&j<a.length){ s+=a[j]; n++; } o.push(s/n); } return o; }
+function drawCharts(){
+  if(!safe){ drawChart($('chElev'),null); drawChart($('chSlope'),null); return; }
+  const profile=safe.profile, xMax=Math.max(profile.distance_m.at(-1),10);
+  drawChart($('chElev'),[{xs:profile.distance_m,ys:profile.elevation_m,color:'#6fe3ff',width:2.4}],{xMax,yMin:Math.min(...profile.elevation_m),yMax:Math.max(...profile.elevation_m),hoverX});
+  drawChart($('chSlope'),[{xs:profile.distance_m,ys:profile.slope_deg,color:'#6fe3ff',width:2.4}],{xMax,yMin:0,yMax:Math.max(35,Math.ceil(safe.environment.max_slope_deg/5)*5),unit:'°',limit:P.limit,hoverX});
+}
+function chartHover(e){
+  const cv=e.currentTarget, m=cv._map; if(!m||!safe) return;
+  const r=cv.getBoundingClientRect(), x=clamp((e.clientX-r.left-m.L)/m.pw*m.xMax,0,safe.profile.distance_m.at(-1));
+  hoverX=x;
+  let k=safe.profile.distance_m.findIndex(v=>v>=x); if(k<0) k=safe.profile.distance_m.length-1;
+  hoverPoint=safe.points[k];
+  $('readout').textContent=`Rota · ${Math.round(safe.profile.distance_m[k])} m: yükseklik ${f1(safe.profile.elevation_m[k])} m, eğim ${f1(safe.profile.slope_deg[k])}°`;
+  drawOverlay(); drawCharts();
+}
+function chartLeave(){ hoverX=null; hoverPoint=null; hoverMesh.visible=false; $('readout').textContent=''; drawCharts(); }
+['chElev','chSlope'].forEach(id=>{ $(id).addEventListener('pointermove',chartHover); $(id).addEventListener('pointerleave',chartLeave); });
+
+/* ---------- rota özeti ---------- */
+function renderStats(){
+  const stats=$('stats');
+  if(!safe){
+    const status=routeLoading?'İşleniyor…':routeError==='No traversable route exists for these limits'?'Rota bulunamadı':routeError?'Hata':routeDirty?'Hesaplama bekliyor':'—';
+    stats.innerHTML='<div>Durum</div><div class="v">'+status+'</div>';
+    return;
+  }
+  const env=safe.environment||{};
+  stats.innerHTML=[
+    ...(safe.fallback?[['Rota türü','En düşük risk · uyarılı']]:[]),
+    ['Mesafe',fm(env.distance_m)+' m'],['Yüzey mesafesi',fm(env.surface_distance_m)+' m'],
+    ['En dik eğim',f1(env.max_slope_deg)+'°'],['Ort. eğim',f1(env.mean_slope_deg)+'°'],
+    ['Tırmanış',fm(env.ascent_m)+' m'],['İniş',fm(env.descent_m)+' m'],
+    ['HiRISE kapsamı',f1(env.hirise_cell_share_pct||0)+'%'],['Dijkstra hareketi',safe.optimality.gridMoves]
+  ].map(([label,value])=>`<div>${label}</div><div class="v">${value}</div>`).join('');
+}
+function renderReasons(){
+  const list=$('reasons');
+  list.replaceChildren();
+  if(routeError||!A||!B||routeLoading||routeDirty||!safe){
+    const item=document.createElement('li');
+    item.textContent=routeError==='No traversable route exists for these limits'
+      ? 'Bu eğim ve kaya sınırlarıyla A ile B arasında geçilebilir rota bulunamadı. Eğim sınırını artırmayı veya noktaları taşımayı deneyin.'
+      : routeError||(!A?'Haritada başlangıç noktasını (A) seç.':!B?'Şimdi varış noktasını (B) seç.':routeLoading?'Rota hesaplanıyor…':routeDirty?'Hesaplamayı başlatmak için Hesapla düğmesine bas.':'Bu ayarlarla geçilebilir rota bulunamadı.');
+    list.append(item);
+  }else{
+    if(safe.fallback){
+      const warning=document.createElement('li');
+      warning.textContent=safe.routeWarning||'Tamamen geçilebilir rota bulunamadı; bu, mevcut seçenekler içindeki en düşük riskli alternatiftir.';
+      list.append(warning);
+    }
+    const why=document.createElement('li');
+    why.textContent=safe.why||'AI rota açıklaması alınamadı.';
+    list.append(why);
+    for(const factor of safe.factors||[]){
+      const item=document.createElement('li');
+      item.textContent=`${factor.name}: ${factor.value} ${factor.effect}`;
+      list.append(item);
+    }
+    if(safe.navigation){
+      const item=document.createElement('li');
+      item.textContent=`Navigasyon: ${safe.navigation}`;
+      list.append(item);
+    }
+  }
+  const warning=$('warn');
+  warning.style.display=routeError||safe?.fallback?'block':'none';
+  warning.textContent=routeError||(safe?.fallback?'Tamamen güvenli rota yok. Kırmızı çizgi, en düşük riskli fakat tehlikeli geçişi gösterir.':'');
+}
+function renderGuide(){
+  const g=$('guide');
+  if(!A) g.innerHTML='<b>Başlangıç:</b> Haritada konuma gelin; A\'yı koy düğmesine basın veya A tuşunu kullanın.';
+  else if(!B) g.innerHTML='<b>Varış:</b> Yeni konuma gelin; B\'yi koy düğmesine basın veya B tuşunu kullanın.';
+  else if(!terrainReady) g.innerHTML='<b>Arazi yükleniyor.</b> Gerçek pathing terrain verisi bekleniyor…';
+  else if(routeLoading) g.innerHTML='<b>Rota hesaplanıyor.</b> AI rota özeti hazırlanıyor…';
+  else if(routeError==='No traversable route exists for these limits') g.innerHTML='<b>Bu sınırlarla rota bulunamadı.</b> Eğim limitini artırın veya A/B noktalarını değiştirin.';
+  else if(routeError) g.innerHTML='<b>Rota alınamadı.</b> Harita ayarlarını veya backend durumunu kontrol et.';
+  else if(safe?.fallback) g.innerHTML='<b>Uyarılı alternatif rota.</b> Tamamen güvenli geçiş bulunamadı; kırmızı çizgi en düşük riskli seçeneği gösteriyor.';
+  else if(routeDirty) g.innerHTML='<b>Rota hazır.</b> Hesaplamayı başlatmak için Hesapla düğmesine bas.';
+  else if(example) g.innerHTML='<b>Örnek rota.</b> Kendi rotan için haritada iki noktaya tıkla.';
+  else if(safe) g.innerHTML='<b>Rota hazır.</b> AI rota özeti ve navigasyon önerisi hazır.';
+  else g.innerHTML='<b>Rota bulunamadı.</b> Ayarları değiştirip yeniden deneyebilirsin.';
+  $('swap').disabled=!(A&&B); $('clear').disabled=!A; $('cRoute').disabled=!safe;
+  $('setA').disabled=!selectionPoint; $('setB').disabled=!selectionPoint;
+  $('calculate').disabled=!(A&&B)||routeLoading||!terrainReady;
+  $('calculate').textContent=routeLoading?'Hesaplanıyor…':routeDirty?'Hesapla':'Yeniden hesapla';
+}
+
+/* ---------- route request ---------- */
+function updateAll(){ drawOverlay(); drawCharts(); renderStats(); renderReasons(); renderGuide(); }
+let routeRequestId=0;
+let routeDirty=true;
+function invalidateRoute(){
+  routeRequestId++;
+  safe=null;
+  routeError='';
+  routeLoading=false;
+  routeDirty=true;
+  hoverPoint=null; hoverMesh.visible=false;
+  hoverX=null;
+  updateAll();
+}
+async function requestRoute(){
+  const requestId=++routeRequestId;
+  safe=null; routeError=''; routeLoading=!!(A&&B);
+  routeDirty=false;
+  updateAll();
+  if(!A||!B) return;
+  try{
+    const response=await fetch('/route',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({start:A,end:B})
+    });
+    const data=await response.json();
+    if(!response.ok) throw new Error(data.error||'Rota isteği başarısız oldu.');
+    if(requestId!==routeRequestId) return;
+    if(data.route.length){
+      safe={points:data.route,profile:data.profile,optimality:data.optimality,environment:data.environment,why:data.narration?.why||'AI rota açıklaması alınamadı.',factors:data.narration?.factors||[],navigation:data.narration?.navigation||'',fallback:!!data.fallback,routeWarning:data.routeWarning};
+      routeLoading=false;
+      updateAll();
+      if(data.narrationError) routeError=`Rota hesaplandı; AI özeti alınamadı: ${data.narrationError}`;
+    }
+  }catch(error){
+    if(requestId===routeRequestId) routeError=error.message||'AI servisine ulaşılamadı.';
+  }finally{
+    if(requestId===routeRequestId){ routeLoading=false; updateAll(); }
+  }
+}
+async function loadRealTerrain(){
+  terrainReady=false; updateAll();
+  try{
+    const response=await fetch('/terrain');
+    if(!response.ok) throw new Error('Gerçek arazi verisi yüklenemedi.');
+      const data=await response.json();
+      T.bounds=data.bounds;
+      const elevation=data.elevation.flat(), slope=data.slope.flat();
+      const minimum=Math.min(...elevation);
+      T.h=Float32Array.from(elevation,value=>value-minimum);
+      T.slope=Float32Array.from(slope);
+      T.renderWidth=data.renderWidth; T.renderHeight=data.renderHeight;
+      T.renderH=Float32Array.from(data.renderElevation.flat(),value=>value-minimum);
+      T.renderSlope=Float32Array.from(data.renderSlope.flat());
+      T.hMin=minimum;
+      let maximum=0; for(const value of T.renderH) if(value>maximum) maximum=value;
+      T.hMax=maximum;
+    T.rock=new Float32Array(W*H);
+    T.sand=new Float32Array(W*H);
+    T.dataSource=data.source;
+    terrainReady=true;
+    renderTerrainTexture(); buildTerrainMesh(); drawOverlay();
+    invalidateRoute();
+  }catch(error){
+    routeError=error.message||'Gerçek arazi verisi yüklenemedi.';
+    updateAll();
+  }
+}
+/* ---------- etkileşim ---------- */
+const tip=$('tip'), mb=$('mapbox');
+canvas.addEventListener('pointerenter',()=>canvas.focus({preventScroll:true}));
+function hitTerrain(event){
+  if(!terrainReady) return null;
+  const rect=canvas.getBoundingClientRect();
+  pointerNdc.set((event.clientX-rect.left)/rect.width*2-1,-((event.clientY-rect.top)/rect.height)*2+1);
+  raycaster.setFromCamera(pointerNdc,camera);
+  const terrainHit=terrainMesh?raycaster.intersectObject(terrainMesh,false)[0]:null;
+  const globeHit=raycaster.intersectObject(sphere,false)[0];
+  if(terrainHit&&(!globeHit||terrainHit.distance<globeHit.distance))return terrainHit;
+  if(!globeHit)return null;
+  const globePoint=globeHit.point.clone().normalize();
+  const lon=Math.atan2(globePoint.x,globePoint.z)*DEG,lat=Math.asin(clamp(globePoint.y,-1,1))*DEG;
+  return geoToPoint(lon,lat)?globeHit:null;
+}
+function hitToPoint(hit){
+  const point=hit.point.clone().normalize();
+  const lon=Math.atan2(point.x,point.z)*DEG,lat=Math.asin(clamp(point.y,-1,1))*DEG;
+  return geoToPoint(lon,lat);
+}
+function nearMarker(point){
+  const dA=A?Math.hypot(point.x-A.x,point.y-A.y):Infinity;
+  const dB=B?Math.hypot(point.x-B.x,point.y-B.y):Infinity;
+  return Math.min(dA,dB)<5?(dA<=dB?'A':'B'):null;
+}
+function updateHover(hit,event){
+  const point=hit?hitToPoint(hit):null;
+  hoverPoint=point;
+  if(point) selectionPoint={x:point.x,y:point.y};
+  if(point){const geo=pointToGeo(point);hoverMesh.position.copy(geoVector(geo.lon,geo.lat,1.0008));hoverMesh.visible=true;}
+  else hoverMesh.visible=false;
+  if(!point){tip.style.display='none';return;}
+  const rx=Math.round(point.x/(W-1)*(T.renderWidth-1)),ry=Math.round(point.y/(H-1)*(T.renderHeight-1));
+  const index=ry*T.renderWidth+rx,slope=T.renderSlope[index],elevation=T.renderH[index],bad=slope>P.limit;
+  tip.innerHTML=`göreli yükseklik ${f1(elevation)} m<br>eğim <b style="color:${bad?'#ff7b7b':'#6fe3ff'}">${f1(slope)}°</b>${bad?'<br><b style="color:#ff7b7b">20° sınırının üstü</b>':''}`;
+  const rect=mb.getBoundingClientRect();let left=event.clientX-rect.left+12,top=event.clientY-rect.top+12;
+  if(left>rect.width-155)left-=170;if(top>rect.height-75)top-=85;
+  tip.style.left=left+'px';tip.style.top=top+'px';tip.style.display=event.pointerType==='touch'?'none':'block';
+  renderGuide();
+}
+canvas.addEventListener('pointerdown',event=>{
+  const hit=hitTerrain(event),point=hit&&hitToPoint(hit);
+  press={x:event.clientX,y:event.clientY,moved:false,point};
+  drag=point?nearMarker(point):null;
+  if(drag) controls.enabled=false;
+  tip.style.display='none';
+});
+canvas.addEventListener('pointermove',event=>{
+  if(press&&Math.hypot(event.clientX-press.x,event.clientY-press.y)>5)press.moved=true;
+  if(drag&&press?.moved){
+    const hit=hitTerrain(event),point=hit&&hitToPoint(hit);
+    if(point){if(drag==='A')A=point;else B=point;routeRequestId++;safe=null;routeLoading=false;routeDirty=true;updateAll();}
+    return;
+  }
+  if(!press)updateHover(hitTerrain(event),event);
+});
+function endGlobePointer(event){
+  if(!press)return;
+  const moved=press.moved,dragged=drag,selectedPoint=press.point;
+  press=null;drag=null;controls.enabled=true;
+  if(dragged){if(moved)invalidateRoute();return;}
+  if(moved||event.type==='pointercancel')return;
+  const point=selectedPoint;
+  if(!point)return;
+  if(!A||B){setRoutePoint('A',point);}
+  else setRoutePoint('B',point);
+}
+function setRoutePoint(label,point){
+  if(!point)return;
+  const selected={x:point.x,y:point.y};
+  if(label==='A'){
+    A=selected;
+    if(B&&A.x===B.x&&A.y===B.y)B=null;
+  }else{
+    B=selected;
+    if(A&&A.x===B.x&&A.y===B.y)B=null;
+  }
+  example=false;invalidateRoute();
+}
+document.addEventListener('keydown',event=>{
+  if(event.ctrlKey||event.metaKey||event.altKey||event.repeat)return;
+  const target=event.target;
+  if(target instanceof HTMLElement&&(
+    target.isContentEditable||['INPUT','TEXTAREA','SELECT'].includes(target.tagName)))return;
+  const key=event.key.toLowerCase();
+  if((key==='a'||key==='b')&&selectionPoint){
+    event.preventDefault();setRoutePoint(key.toUpperCase(),selectionPoint);
+  }
+});
+canvas.addEventListener('pointerup',endGlobePointer);
+canvas.addEventListener('pointercancel',endGlobePointer);
+canvas.addEventListener('pointerleave',()=>{tip.style.display='none';hoverPoint=null;hoverMesh.visible=false;});
+
+document.querySelectorAll('#layers button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('#layers button').forEach(x=>x.classList.toggle('on',x===b));
+  layer=b.dataset.l; renderTerrainTexture();drawOverlay();
+}));
+document.querySelectorAll('#range button').forEach(button=>button.addEventListener('click',()=>{
+  document.querySelectorAll('#range button').forEach(item=>item.classList.toggle('on',item===button));
+  rangeMode=button.dataset.range;setCamera(rangeMode==='mars'?3.5:1.026);tip.style.display='none';
+}));
+$('swap').addEventListener('click',()=>{ if(A&&B){ [A,B]=[B,A]; invalidateRoute(); } });
+$('setA').addEventListener('click',()=>setRoutePoint('A',selectionPoint));
+$('setB').addEventListener('click',()=>setRoutePoint('B',selectionPoint));
+$('clear').addEventListener('click',()=>{ A=B=null; example=false; invalidateRoute(); });
+$('calculate').addEventListener('click',()=>{
+  if(!(A&&B)||routeLoading) return;
+  requestRoute();
+});
+
+window.addEventListener('resize',()=>{resizeGlobe();drawCharts();});
+
+/* ---------- durma mesafesi hesaplayıcı ---------- */
+const BODIES=[['Mars',3.72,'#ff7a3d'],['Dünya',9.81,'#6fe3ff'],['Ay',1.62,'#d9d2c8']];
+const fD=d=>d<1?f1(d*100)+' cm':(d<1000?f1(d)+' m':(d/1000).toLocaleString('tr-TR',{maximumFractionDigits:2})+' km');
+function calc(){
+  const v=+$('cV').value, deg=+$('cT').value, th=deg/DEG, mu=+$('cMu').value, up=$('cDir').value==='up';
+  $('cVv').textContent=f1(v)+' m/s · '+fm(v*3.6)+' km/sa'; $('cTv').textContent=f1(deg)+'°'; $('cMuv').textContent=mu.toLocaleString('tr-TR',{minimumFractionDigits:2});
+  const k=up?Math.sin(th)+mu*Math.cos(th):mu*Math.cos(th)-Math.sin(th);
+  $('cFormula').textContent=up?'d = v₀² / (2·g·(sinθ + μ·cosθ))':'d = v₀² / (2·g·(μ·cosθ − sinθ))';
+  if(k<=1e-6){
+    $('cBars').innerHTML='';
+    $('cOut').innerHTML='<b style="color:var(--danger)">Araç duramaz.</b> Bu eğimde tanθ ≥ μ olduğu için sürtünme aracı tutamaz; araç frenlese bile hızlanarak kayar. Bu sonuç yer çekiminden bağımsızdır: Mars\'ta da Dünya\'da da aynıdır.';
+    return;
+  }
+  const res=BODIES.map(b=>({n:b[0],g:b[1],c:b[2],d:v*v/(2*b[1]*k)})), mx=Math.max(...res.map(r=>r.d));
+  $('cBars').innerHTML=res.map(r=>`<div class="bar"><div class="top"><span>${r.n} <span style="color:var(--dim)">(g = ${r.g.toLocaleString('tr-TR')} m/s²)</span></span><b>${fD(r.d)}</b></div><div class="track"><div class="fill" style="width:${Math.max(1.5,r.d/mx*100)}%;background:${r.c}"></div></div></div>`).join('');
+  $('cOut').innerHTML='Araç Mars\'ta Dünya\'dakinin <b style="color:var(--text)">'+f1(res[0].d/res[1].d)+' katı</b> yol alır. Bu oran yalnızca g değerlerinin oranına bağlıdır; hız, eğim ve sürtünme değişse de aynı kalır.';
+}
+['cV','cT','cMu','cDir'].forEach(id=>$(id).addEventListener('input',calc));
+ $('cRoute').addEventListener('click',()=>{ if(safe){ $('cT').value=Math.min(40,Math.round(safe.environment.max_slope_deg*2)/2); calc(); } });
+
+calc(); loadRealTerrain();
+})();
+</script>
+</body>
+</html>

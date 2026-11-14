@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Martian Map – Jezero Route Planner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+<header>
+  <h1>Interplanetary Survival Guide: <span>Martian Map</span></h1>
+  <p class="sub">Jezero crater work area · walking-route prototype</p>
+</header>
+<main>
+  <section id="viewArea">
+    <div class="tabs" role="tablist">
+      <button role="tab" class="tab active" data-view="map" aria-selected="true">2D map</button>
+      <button role="tab" class="tab" data-view="terrain3d" aria-selected="false">3D terrain</button>
+    </div>
+    <div id="map" class="view active"></div>
+    <div id="terrain3d" class="view" aria-live="polite"></div>
+    <div id="legend">
+      <div><i style="background:rgba(230,60,40,.6)"></i> Slope &gt; <span class="lim">20</span>° (impassable)</div>
+      <div><i style="background:rgba(80,80,255,.6)"></i> No elevation data (impassable)</div>
+      <div><i style="background:rgba(76,201,240,.35);border:1px solid #4cc9f0"></i> HiRISE 1 m slope coverage</div>
+      <div><i class="dot"></i> Perseverance waypoint</div>
+      <div class="coords">Cursor: <span id="cursor">–</span></div>
+    </div>
+  </section>
+  <aside id="panel">
+    <div class="block">
+      <h2>1 · Pick points</h2>
+      <p class="hint" id="pickHint">Click the map to set the <b>start</b>.</p>
+      <dl class="points">
+        <dt>Start</dt><dd id="startTxt">–</dd>
+        <dt>Destination</dt><dd id="destTxt">–</dd>
+      </dl>
+      <div class="row">
+        <button id="computeBtn" disabled>Compute routes</button>
+        <button id="resetBtn" class="ghost">Reset</button>
+      </div>
+      <div id="msg" role="alert"></div>
+    </div>
+    <div class="block">
+      <h2>2 · Compare routes</h2>
+      <div id="cards"><p class="hint">Routes will appear here.</p></div>
+      <div id="modelNote" class="hint"></div>
+    </div>
+    <details class="block">
+      <summary>Rules &amp; limitations</summary>
+      <ul id="limits"></ul>
+    </details>
+    <details class="block">
+      <summary>Data sources</summary>
+      <ul id="sources"></ul>
+    </details>
+    <p class="disclaimer">Student prototype for the NASA Space Apps Challenge 2026. Not affiliated with or endorsed by NASA.
+      Not for real mission planning. Route numbers are computed by deterministic code; optional text is reworded by Gemma 4 and checked against those numbers.</p>
+  </aside>
+</main>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+               "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/" } }
+</script>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>

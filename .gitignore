@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+
+# Local secrets and environment overrides
+.env
+.env.*
+!.env.example
+
+# Generated caches and logs
+.cache/
+coverage/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+__pycache__/
+*.py[cod]
+
+# Operating system and editor files
+.DS_Store
+Thumbs.db
+__MACOSX/
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
