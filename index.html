@@ -86,6 +86,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .stats .v{font-family:var(--mono);text-align:right;font-size:12px}
 .stats .c1{color:var(--safe)} .stats .c2{color:var(--short)} .stats .c3{color:var(--card-text)}
 .stats .bad{color:var(--danger)} .stats .good{color:var(--ok)}
+/* Route summary rows: 2 px smaller than the other stat boxes */
+#stats{font-size:10.5px} #stats .v{font-size:10px}
 .note{font-size:13px;color:var(--muted)}
 .tgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin:4px 0 10px}
 .tgrid label{display:block;font-size:12px;color:var(--muted)}
@@ -240,7 +242,7 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
       <div class="card">
         <h3>Route summary</h3>
         <div class="stats" id="stats"></div>
-        <div class="note" style="margin-top:8px;font-size:12px">Slope source: CTX 20 m + partial HiRISE 1 m. The AI does not generate terrain values.</div>
+        <div class="note" style="margin-top:8px;font-size:10px">Slope source: CTX 20 m + partial HiRISE 1 m. The AI does not generate terrain values.</div>
       </div>
       <div class="card" id="missionCard">
         <h3>Mission data</h3>
