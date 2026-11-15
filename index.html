@@ -92,6 +92,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .tgrid input{width:100%;margin-top:2px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:5px 7px;font:12.5px var(--mono)}
 .tgrid input:focus{outline:1px solid var(--accent)}
 .tgrid small{display:block;font-size:10.5px;line-height:1.3;color:var(--dim);margin-top:2px}
+.zonebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 4px 8px;font-size:12.5px;color:var(--muted)}
+.zonebar select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;font:12.5px var(--mono)}
+.btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.zlist{list-style:none;margin:0;padding:0;font-size:12.5px}
+.zlist li{padding:7px 4px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px}
+.zlist li:hover{background:var(--panel2)}
+.zlist .km{font:600 12px var(--mono);color:var(--accent);grid-row:span 2}
+.zlist .meta{font:11.5px var(--mono);color:var(--muted)}
+.lit{color:var(--short)} .shade{color:var(--dim)}
 .infobox{margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg2);font-size:12.5px}
 .stats .sec{grid-column:1/-1;font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em;padding-top:10px}
 .warnbox{display:none;margin-top:10px;padding:10px;border-radius:9px;background:color-mix(in srgb,var(--danger) 12%,transparent);border:1px solid color-mix(in srgb,var(--danger) 45%,transparent);font-size:13px}
@@ -169,6 +178,11 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
           <button class="btn" id="swap">A ⇄ B</button>
         </div>
       </div>
+      <div class="zonebar">
+        <button class="btn" id="zonesToggle" type="button" aria-pressed="true" title="Show or hide flat, low-hazard ~1 km rest / emergency zones">Rest zones</button>
+        <label>Sun hour (LTST) <select id="sunHour"></select></label>
+        <span id="zoneSummary"></span>
+      </div>
       <div id="guide"></div>
       <div class="mapbox" id="mapbox">
         <canvas id="globe" tabindex="0" aria-label="Mars globe and Jezero terrain map"></canvas>
@@ -191,6 +205,12 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
         <h3>Route summary</h3>
         <div class="stats" id="stats"></div>
         <div class="note" style="margin-top:8px;font-size:12px">Slope source: CTX 20 m + partial HiRISE 1 m. The AI does not generate terrain values.</div>
+      </div>
+      <div class="card" id="restCard">
+        <h3>Rest stops along the route</h3>
+        <div class="note" style="font-size:12px;margin-bottom:6px">Flat, low-hazard ~1 km tiles within 2 km of the route, in order. Click one for details.</div>
+        <div id="restSummary" class="note" style="font-size:12.5px"></div>
+        <ul class="zlist" id="restList"></ul>
       </div>
       <div class="card" id="travelCard">
         <h3>Travel time</h3>
@@ -374,7 +394,7 @@ const offscreen=document.createElement('canvas'), tileContext=offscreen.getConte
 const tileTexture=new THREE.CanvasTexture(offscreen); tileTexture.colorSpace=THREE.SRGBColorSpace;
 let terrainMesh=null, terrainImage=null, rangeMode='jezero', layer='elev';
 let T={h:new Float32Array(W*H),hMax:1,slope:new Float32Array(W*H),rock:new Float32Array(W*H),sand:new Float32Array(W*H)};
-let routeMode='ab', BASE=null;
+let routeMode='ab', BASE=null, ZONES=null, showZones=true, sunHour=13;
 let A=null, B=null, example=false, safe=null, routeLoading=false, routeError='';
 let terrainReady=false, hoverPoint=null, selectionPoint=null, hoverX=null, press=null, drag=null;
 
@@ -446,7 +466,9 @@ function animateGlobe(){requestAnimationFrame(animateGlobe);scaleControls();cont
 controls.addEventListener('change',updateScale);
 
 function renderLegend(){
-  const common='<span><span class="sw" style="background:var(--safe)"></span>Computed route</span><span>Pick points inside the Jezero data area</span>';
+  const common='<span><span class="sw" style="background:var(--safe)"></span>Computed route</span>'+
+    (showZones?'<span><span class="sw" style="background:#7dff9b;height:9px;opacity:.7"></span>Rest zone, sunlit</span><span><span class="sw" style="background:#8a93a6;height:9px"></span>Rest zone, shaded</span><span><span class="sw" style="background:#ffd27a;height:9px"></span>Near route</span>':'')+
+    '<span>Pick points inside the Jezero data area; click a rest zone for details (use Set A/B or the A/B keys to route into one)</span>';
   const detail=layer==='slope'
     ? `<span>Green → red slope · red areas &gt; ${P.limit}°</span>`
     : layer==='haz' ? '<span>Red areas: slope impassable for the rover</span>'
@@ -523,6 +545,94 @@ function addMarker(point,label,color){
   sprite.position.copy(position.clone().normalize().multiplyScalar(position.length()+0.0002));
   sprite.scale.setScalar(0.00055);overlayGroup.add(sprite);
 }
+function surfaceAt(lon,lat,offset=0.00016){
+  const p=T.bounds?geoToPoint(lon,lat):null;
+  let radius=1+offset;
+  if(p){ const i=Math.round(p.y/(H-1)*(T.renderHeight-1))*T.renderWidth+Math.round(p.x/(W-1)*(T.renderWidth-1)); radius=1+((T.renderH[i]??0))/MARS_RADIUS_M+offset; }
+  return geoVector(lon,lat,radius);
+}
+function nearRouteIds(){ return new Set((safe?.restZones?.zones||[]).map(z=>z.id)); }
+function addZoneTiles(){
+  if(!showZones||!ZONES?.zones?.length||!T.renderH) return;
+  const near=nearRouteIds(), n=4;
+  const groups={near:[],lit:[],shade:[]}, outlines={near:[],other:[]};
+  for(const z of ZONES.zones){
+    const b=z.bounds, kind=near.has(z.id)?'near':(z.sunlit?'lit':'shade');
+    const grid=[];
+    for(let i=0;i<=n;i++) for(let j=0;j<=n;j++) grid.push(surfaceAt(b.west+(b.east-b.west)*j/n,b.north-(b.north-b.south)*i/n));
+    const at=(i,j)=>grid[i*(n+1)+j];
+    for(let i=0;i<n;i++) for(let j=0;j<n;j++){ const a=at(i,j),bq=at(i+1,j),c=at(i,j+1),d=at(i+1,j+1); groups[kind].push(a,bq,c,c,bq,d); }
+    const ring=[...Array(n+1).keys()].map(j=>at(0,j)).concat([...Array(n+1).keys()].map(i=>at(i,n)),[...Array(n+1).keys()].reverse().map(j=>at(n,j)),[...Array(n+1).keys()].reverse().map(i=>at(i,0)));
+    const line=outlines[kind==='near'?'near':'other'];
+    for(let k=1;k<ring.length;k++) line.push(ring[k-1],ring[k]);
+  }
+  const colors={near:[0xffd27a,0.55],lit:[0x7dff9b,0.28],shade:[0x8a93a6,0.28]};
+  for(const [kind,verts] of Object.entries(groups)){
+    if(!verts.length) continue;
+    const g=new THREE.BufferGeometry().setFromPoints(verts);
+    const m=new THREE.MeshBasicMaterial({color:colors[kind][0],transparent:true,opacity:colors[kind][1],depthWrite:false,side:THREE.DoubleSide});
+    const mesh=new THREE.Mesh(g,m); mesh.renderOrder=2; overlayGroup.add(mesh);
+  }
+  for(const [kind,verts] of Object.entries(outlines)){
+    if(!verts.length) continue;
+    const g=new THREE.BufferGeometry().setFromPoints(verts);
+    const line=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:kind==='near'?0xffd27a:0xd8f5df,transparent:true,opacity:kind==='near'?0.95:0.6,depthWrite:false}));
+    line.renderOrder=3; overlayGroup.add(line);
+  }
+}
+function zoneAt(lon,lat){
+  if(!showZones||!ZONES?.zones) return null;
+  return ZONES.zones.find(z=>lon>=z.bounds.west&&lon<=z.bounds.east&&lat>=z.bounds.south&&lat<=z.bounds.north)||null;
+}
+function showZonePopup(zone){
+  const nearInfo=(safe?.restZones?.zones||[]).find(z=>z.id===zone.id);
+  const sun=ZONES?.sun, site=ZONES?.site_wide||{};
+  const light=zone.sunlit?`<span class="lit">sunlit</span> (${f2(zone.illumination,2)})`:`<span class="shade">shaded</span>${zone.shade_reason?' – '+zone.shade_reason:''}`;
+  const v=(x,u,d=1)=>Number.isFinite(x)?f2(x,d)+u:'no data';
+  showPopup(`<h4>Rest zone ${zone.id}</h4><div class="kv">
+    <div>Score (0–100)</div><div class="v">${f1(zone.score)}</div>
+    <div>Mean slope</div><div class="v">${f2(zone.mean_slope_deg)}°</div>
+    <div>Max slope (one 60 m cell)</div><div class="v">${f2(zone.max_slope_deg)}°</div>
+    <div>Relief (max − min)</div><div class="v">${f1(zone.relief_m)} m</div>
+    <div>Passable cells</div><div class="v">${f1(zone.passable_share_pct)}%</div>
+    <div>Crater/basin penalty</div><div class="v">${f2(zone.mean_depression_penalty,3)}</div>
+    <div>Tile size</div><div class="v">${f2(zone.size_m/1000,2)} km</div></div>
+    <div class="tag">Sun at ${String(sun?.hour_ltst??sunHour).padStart(2,'0')}:00 LTST</div><div class="kv">
+    <div>Sun elevation</div><div class="v">${v(sun?.elevation_deg,'°')}</div>
+    <div>Sun azimuth</div><div class="v">${v(sun?.azimuth_deg,'°')}</div>
+    <div>Illumination</div><div class="v">${light}</div></div>
+    <div class="tag">Site-wide (Perseverance MEDA / Curiosity RAD)</div><div class="kv">
+    <div>Air temperature</div><div class="v">${v(site.air_temp_c,' °C')}</div>
+    <div>Ground temperature</div><div class="v">${v(site.ground_temp_c,' °C')}</div>
+    <div>Radiation (Gale)</div><div class="v">${v(site.radiation_msv_per_day,' mSv/day',2)}</div></div>
+    <div class="tag">Distances</div><div class="kv">
+    <div>To base</div><div class="v">${zone.distance_to_base_m==null?'—':f2(zone.distance_to_base_m/1000,2)+' km'}</div>
+    <div>To route</div><div class="v">${nearInfo?f2(nearInfo.distance_to_route_m/1000,2)+' km (at route km '+f2(nearInfo.route_km,2)+')':(safe?'more than 2 km':'no route yet')}</div></div>
+    <div class="muted">${sun?.season_note||''}. Temperature and radiation are single site values; zones are not ranked by them.</div>`);
+}
+async function loadRestZones(){
+  try{
+    const response=await fetch('/rest-zones?hour='+sunHour);
+    if(!response.ok) throw new Error();
+    ZONES=await response.json();
+    $('zoneSummary').textContent=`${ZONES.count} zones · sun ${f1(ZONES.sun.elevation_deg)}° · ${ZONES.zones.filter(z=>z.sunlit).length} sunlit`;
+  }catch(error){ ZONES=null; $('zoneSummary').textContent='Rest zones unavailable'; }
+  drawOverlay();
+}
+function renderRestList(){
+  const list=$('restList'), sum=$('restSummary'), rz=safe?.restZones;
+  list.replaceChildren();
+  if(!rz){ sum.textContent=routeLoading?'Processing…':'Calculate a route to list rest stops.'; return; }
+  sum.innerHTML=rz.zones.length
+    ? `${rz.zones.length} zone${rz.zones.length>1?'s':''} within ${f2(rz.near_route_limit_m/1000)} km. Longest stretch without one: <b>${f2(rz.longest_gap_m/1000,2)} km</b> (route km ${f2(rz.longest_gap_from_km,2)}–${f2(rz.longest_gap_to_km,2)}).`
+    : `No rest zone within ${f2(rz.near_route_limit_m/1000)} km of this route (${f2(rz.route_length_m/1000,2)} km without one).`;
+  for(const z of rz.zones){
+    const li=document.createElement('li');
+    li.innerHTML=`<span class="km">km ${f2(z.route_km,1)}</span><span>${z.id} · score ${f1(z.score)}</span><span class="meta">${f2(z.distance_to_route_m/1000,2)} km off route · slope ${f2(z.mean_slope_deg)}° · ${z.sunlit?'<span class="lit">sunlit '+f2(z.illumination,2)+'</span>':'<span class="shade">shaded</span>'}</span>`;
+    li.addEventListener('click',()=>showZonePopup(ZONES?.zones.find(x=>x.id===z.id)||z));
+    list.append(li);
+  }
+}
 function baseSurfacePoint(){
   const point=routeSurfacePoint(BASE.point), geo={lon:BASE.lon,lat:BASE.lat};
   return geoVector(geo.lon,geo.lat,point.length());
@@ -591,6 +701,7 @@ function drawOverlay(){
     const material=new THREE.MeshBasicMaterial({color:safe.fallback?0xff705e:0x69d7e8});
     overlayGroup.add(new THREE.Mesh(geometry,material));
   }
+  addZoneTiles();
   if(A&&routeMode==='ab') addMarker(A,'A',0x7dff9b);
   if(B) addMarker(B,'B',0xff7a3d);
   addBaseMarker();
@@ -756,6 +867,7 @@ function renderGuide(){
   else if(!terrainReady) g.innerHTML='<b>Loading terrain.</b> Waiting for real pathing terrain data…';
   else if(routeLoading) g.innerHTML='<b>Calculating route.</b> Preparing AI route summary…';
   else if(routeError==='No traversable route exists for these limits') g.innerHTML='<b>No route found with these limits.</b> Raise the slope limit or move points A/B.';
+  else if(safe&&routeError) g.innerHTML='<b>Route ready.</b> AI route summary unavailable (language model not connected); all measured values are shown.';
   else if(routeError) g.innerHTML='<b>Route unavailable.</b> Check the map settings or the backend status.';
   else if(safe?.fallback) g.innerHTML='<b>Least-risk fallback route.</b> No fully safe crossing was found; the red line shows the least-risk option, which crosses hazardous terrain.';
   else if(routeDirty) g.innerHTML='<b>Points set.</b> Press Calculate to start.';
@@ -769,7 +881,7 @@ function renderGuide(){
 }
 
 /* ---------- route request ---------- */
-function updateAll(){ drawOverlay(); drawCharts(); renderStats(); renderTravel(); renderReasons(); renderGuide(); }
+function updateAll(){ drawOverlay(); drawCharts(); renderStats(); renderTravel(); renderRestList(); renderReasons(); renderGuide(); }
 let routeRequestId=0;
 let routeDirty=true;
 function invalidateRoute(){
@@ -791,13 +903,13 @@ async function requestRoute(){
   try{
     const response=await fetch('/route',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B}),travel:travelSettingsFromInputs()})
+      body:JSON.stringify({...(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B}),travel:travelSettingsFromInputs(),hour:sunHour})
     });
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Route request failed.');
     if(requestId!==routeRequestId) return;
     if(data.route.length){
-      safe={points:data.route,profile:data.profile,optimality:data.optimality,environment:data.environment,why:data.narration?.why||'AI route explanation unavailable.',factors:data.narration?.factors||[],navigation:data.narration?.navigation||'',fallback:!!data.fallback,routeWarning:data.routeWarning,travel:data.travel};
+      safe={points:data.route,profile:data.profile,optimality:data.optimality,environment:data.environment,why:data.narration?.why||'AI route explanation unavailable.',factors:data.narration?.factors||[],navigation:data.narration?.navigation||'',fallback:!!data.fallback,routeWarning:data.routeWarning,travel:data.travel,restZones:data.restZones};
       routeLoading=false;
       updateAll();
       if(data.narrationError) routeError=`Route calculated; AI summary unavailable: ${data.narrationError}`;
@@ -839,6 +951,7 @@ async function loadRealTerrain(){
     terrainReady=true;
     renderTerrainTexture(); buildTerrainMesh(); drawOverlay();
     await loadBase();
+    await loadRestZones();
     invalidateRoute();
   }catch(error){
     routeError=error.message||'Could not load real terrain data.';
@@ -913,6 +1026,9 @@ function endGlobePointer(event){
   if(baseScreenDistance(event)<22){ showBasePopup(); return; }
   const point=selectedPoint;
   if(!point)return;
+  const zoneHit=hitTerrain(event), zp=zoneHit?.point?.clone().normalize();
+  const zone=zp?zoneAt(Math.atan2(zp.x,zp.z)*DEG,Math.asin(clamp(zp.y,-1,1))*DEG):null;
+  if(zone){ showZonePopup(zone); return; }
   if(routeMode==='base') setRoutePoint('B',point);
   else if(!A||B){setRoutePoint('A',point);}
   else setRoutePoint('B',point);
@@ -965,6 +1081,9 @@ document.querySelectorAll('#mode button').forEach(button=>button.addEventListene
   example=false; invalidateRoute();
 }));
 $('popupClose').addEventListener('click',hidePopup);
+for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+':00'; if(h===sunHour) o.selected=true; $('sunHour').append(o); }
+$('sunHour').addEventListener('change',()=>{ sunHour=Number($('sunHour').value); hidePopup(); loadRestZones(); if(safe){ routeDirty=true; renderGuide(); } });
+$('zonesToggle').addEventListener('click',()=>{ showZones=!showZones; $('zonesToggle').setAttribute('aria-pressed',String(showZones)); hidePopup(); drawOverlay(); renderLegend(); });
 ['tRover','tWalk','tWalkM','tLimit','tStart'].forEach(id=>$(id).addEventListener('input',onTravelInput));
 document.addEventListener('keydown',event=>{ if(event.key==='Escape') hidePopup(); });
 $('calculate').addEventListener('click',()=>{

@@ -3,6 +3,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { weatherFor, waypointImagesFor, trekLayers } = require('./weather');
 const { computeBase, computeTravel, farthestFromBase } = require('./planning');
+const { createRestZones, zonesNearRoute } = require('./restzones');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -10,6 +11,8 @@ const aiBackendUrl = process.env.AI_BACKEND_URL || 'http://localhost:5001';
 const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS) > 0 ? Number(process.env.AI_TIMEOUT_MS) : 300000;
 const pathingModulePromise = import(pathToFileURL(path.join(__dirname, 'pathing/src/server/routing.js')).href);
 const pathingTerrainPromise = pathingModulePromise.then(({ Terrain }) => Terrain.load(path.join(__dirname, 'pathing/src/build')));
+// Rest / emergency zones, computed once from the terrain grid.
+const restZonesPromise = pathingTerrainPromise.then(createRestZones);
 // Base camp at the map centre, computed once from the terrain grid.
 const basePromise = pathingTerrainPromise.then(terrain => {
     const base = computeBase(terrain);
@@ -29,6 +32,7 @@ const navigationSystemPrompt = [
     'If risk.shortestAlternative is present, compare its measured distance, balanced traversal cost, depression penalty, and adjacent blocked-cell contacts with the chosen route. Describe only differences supported by those values; do not assume the alternative is riskier. If it is absent, say the shortest and balanced objectives produced the same route.',
     'environment.weather holds measured medians for the selected local hour at Jezero (Perseverance MEDA temperature, pressure, wind and humidity; Mastcam-Z dust optical depth; Mars24 sun elevation; Curiosity RAD radiation from Gale crater). Describe them as typical measured conditions, not a forecast. Use only these supplied values; if a value is null, say it is unavailable. Soil strength is unavailable. Never invent weather conditions. Weather did not change the route geometry.',
     'travel holds precomputed rover-plus-walking times, arrival time, EVA-window and walk-back checks, and the EVA radiation dose; quote these values as given and do not recompute them. Travel time is information only and did not change the route.',
+    'restZones lists flat, low-hazard ~1 km tiles within 2 km of the route, in order along it, with their distance to the route, score, slope and sunlight at the selected hour; you may add one short "rest stops" sentence using only these values and the longest stretch without a rest zone. Temperature and radiation are site-wide single values, not per zone.',
     'Include a concise navigation summary describing the broad sequence of route directions and practical rover-following tips, without repeating every coordinate.',
     'Return exactly one syntactically valid JSON object with this schema: {"why":"specific English explanation","factors":[{"name":"Slope","value":"verified value or comparison","effect":"why it matters"}],"environment":{"slope":"...","elevation":"...","surface":"...","weather":"short summary using only the supplied weather values"},"navigation":"concise English overview and practical tips"}.',
     'Every object property must have a colon between its name and value. Separate properties and array items with commas. Quote all property names and string values with double quotes. Do not use comments, trailing commas, or unquoted text.',
@@ -634,6 +638,34 @@ app.post('/ai', async (req, res) => {
     }
 });
 
+function siteWideConditions(weather) {
+    return {
+        label: 'site-wide (Perseverance MEDA / Curiosity RAD)',
+        note: 'Single measurements for the whole map; not used to select or rank rest zones.',
+        hour_ltst: weather?.hour_ltst ?? null,
+        air_temp_c: weather?.air_temp_c ?? null,
+        ground_temp_c: weather?.ground_temp_c ?? null,
+        radiation_msv_per_day: weather?.radiation_msv_per_day ?? null,
+        radiation_note: 'Curiosity RAD, Gale crater'
+    };
+}
+const publicZone = ({ normal, ...zone }) => zone;
+function restZonesForAi(restZones) {
+    return {
+        near_route_limit_m: restZones.near_route_limit_m,
+        count: restZones.zones.length,
+        longest_gap_m: restZones.longest_gap_m,
+        longest_gap_from_km: restZones.longest_gap_from_km,
+        longest_gap_to_km: restZones.longest_gap_to_km,
+        sun: restZones.sun,
+        zones: restZones.zones.slice(0, 10).map(z => ({
+            id: z.id, route_km: z.route_km, along_route_m: Math.round(z.route_km * 1000), distance_to_route_m: z.distance_to_route_m,
+            score: z.score, mean_slope_deg: z.mean_slope_deg, max_slope_deg: z.max_slope_deg, relief_m: z.relief_m,
+            sunlit: z.sunlit, illumination: z.illumination
+        }))
+    };
+}
+
 app.post('/route', async (req, res) => {
     const { end } = req.body;
     const startBase = req.body.startBase === true;
@@ -680,6 +712,10 @@ app.post('/route', async (req, res) => {
             soil_strength: 'unavailable; not used in routing'
         };
         const baseCamp = base || await basePromise.catch(() => null);
+        const restZoneModel = await restZonesPromise;
+        const lit = restZoneModel.withSun(hour, ls);
+        const near = zonesNearRoute(lit.zones, balanced.geometry.coordinates, pathingTerrain, baseCamp);
+        const restZones = { ...near, zones: near.zones.map(publicZone), sun: lit.sun, rules: restZoneModel.rules, site_wide: siteWideConditions(environment.weather) };
         const travel = computeTravel({
             route_length_m: balanced.surface_distance_m,
             farthest_from_base_m: farthestFromBase(balanced.geometry.coordinates, baseCamp, pathingTerrain),
@@ -725,6 +761,7 @@ app.post('/route', async (req, res) => {
             risk,
             optimality,
             travel,
+            restZones,
             status: pathingResult.status,
             fallback: pathingResult.status === 'fallback',
             routeWarning: pathingResult.status === 'fallback' ? pathingResult.reason?.message : null,
@@ -735,14 +772,14 @@ app.post('/route', async (req, res) => {
                 role: 'user',
                 content: JSON.stringify({
                     task: 'Explain why this computed rover route is preferred using a single evidence-based overview.',
-                    route, optimality, environment, risk, travel,
+                    route, optimality, environment, risk, travel, restZones: restZonesForAi(restZones),
                     status: pathingResult.status,
                     fallback: pathingResult.status === 'fallback',
                     routeWarning: response.routeWarning,
                     validation: balanced.validation
                 })
             }], navigationSystemPrompt, true, 1800);
-            const facts = { optimality, environment, risk, travel, status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
+            const facts = { optimality, environment, risk, travel, restZones: restZonesForAi(restZones), status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
             let parsed = null;
             try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
             const checked = checkedNarration(parsed, facts);
@@ -807,6 +844,29 @@ app.post('/travel', async (req, res) => {
         radiation_msv_per_day: radiation,
         settings: req.body?.settings || {}
     }));
+});
+app.get('/rest-zones', async (req, res) => {
+    try {
+        const hour = Number.isFinite(Number(req.query.hour)) && req.query.hour !== '' ? Number(req.query.hour) : 13;
+        const ls = req.query.ls ?? null;
+        const [model, terrain, base] = await Promise.all([restZonesPromise, pathingTerrainPromise, basePromise.catch(() => null)]);
+        const { sun, zones } = model.withSun(hour, ls);
+        return res.json({
+            count: zones.length,
+            tiles_checked: model.total,
+            tile_size_m: Math.round(model.tileCells * terrain.dy),
+            rules: model.rules,
+            score_formula: '100 * (0.5*(1 - mean_slope/max_mean_slope) + 0.3*(1 - relief/max_relief) + 0.2*(1 - mean_depression/max_mean_depression))',
+            sun,
+            site_wide: siteWideConditions(weatherFor({ hour, ls })),
+            zones: zones.map(zone => ({
+                ...publicZone(zone),
+                distance_to_base_m: base?.available ? Math.round(terrain.groundDistance(base.lon, base.lat, zone.lon, zone.lat)) : null
+            }))
+        });
+    } catch (error) {
+        return res.status(500).json({ error: 'Unable to compute rest zones', details: error.message });
+    }
 });
 app.get('/base', async (req, res) => {
     try {
