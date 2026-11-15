@@ -926,25 +926,6 @@ app.get('/rest-zones', async (req, res) => {
         return res.status(500).json({ error: 'Unable to compute rest zones', details: error.message });
     }
 });
-// Default base: the exact centre of the Jezero map image. The image is drawn on the terrain grid's bounds
-// (the same bounds /terrain returns), so the centre comes from those bounds, never from typed-in numbers.
-async function defaultBase() {
-    const terrain = await pathingTerrainPromise;
-    const b = terrain.meta.grid.bounds_lonlat;
-    const lat = (b.south + b.north) / 2, lon = (b.west + b.east) / 2;
-    const base = snapBase(terrain, lon, lat);
-    if (base.available) base.point = lonLatToFrontendPoint([base.lon, base.lat], terrain);
-    const [row, col] = terrain.cellOf(lon, lat);
-    return { ...base, is_default: true, map_centre: { lat, lon, row, col, grid_rows: terrain.H, grid_cols: terrain.W, bounds: b } };
-}
-app.get('/base/default', async (req, res) => {
-    try {
-        const base = await defaultBase();
-        return res.status(base.available ? 200 : 422).json(base);
-    } catch (error) {
-        return res.status(500).json({ error: 'Unable to compute the default base', details: error.message });
-    }
-});
 app.post('/base', async (req, res) => {
     try {
         const base = await resolveBase(req.body);
