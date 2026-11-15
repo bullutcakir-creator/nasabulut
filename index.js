@@ -4,6 +4,7 @@ const { pathToFileURL } = require('node:url');
 const { weatherFor, waypointImagesFor, trekLayers } = require('./weather');
 const { snapBase, computeTravel, farthestFromBase, travelParameters } = require('./planning');
 const { createRestZones, zonesNearRoute } = require('./restzones');
+const { missionData, nearestPerseverance } = require('./missiondata');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -715,6 +716,7 @@ app.post('/route', async (req, res) => {
         const restZoneModel = await restZonesPromise;
         const lit = restZoneModel.withSun(hour, ls);
         const near = zonesNearRoute(lit.zones, balanced.geometry.coordinates, pathingTerrain, baseCamp);
+        const perseverance = nearestPerseverance(balanced.geometry.coordinates, (a, b, c, d) => pathingTerrain.groundDistance(a, b, c, d));
         const restZones = { ...near, zones: near.zones.map(publicZone), sun: lit.sun, rules: restZoneModel.rules, site_wide: siteWideConditions(environment.weather) };
         const travel = computeTravel({
             route_length_m: balanced.surface_distance_m,
@@ -762,6 +764,7 @@ app.post('/route', async (req, res) => {
             optimality,
             travel,
             restZones,
+            perseverance,
             status: pathingResult.status,
             fallback: pathingResult.status === 'fallback',
             routeWarning: pathingResult.status === 'fallback' ? pathingResult.reason?.message : null,
@@ -833,6 +836,7 @@ app.get('/weather', (req, res) => {
 app.get('/waypoint-images', (req, res) => {
     res.json(waypointImagesFor(req.query.site, req.query.drive));
 });
+app.get('/mission-data', (req, res) => res.json(missionData({ hour: req.query.hour ?? 13, ls: req.query.ls ?? null })));
 app.get('/travel-parameters', (req, res) => res.json(travelParameters()));
 app.post('/travel', async (req, res) => {
     const length = Number(req.body?.route_length_m);

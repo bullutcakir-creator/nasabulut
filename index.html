@@ -111,6 +111,25 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .zlist .meta{font:11.5px var(--mono);color:var(--muted)}
 .znum{display:inline-block;min-width:20px;height:20px;line-height:20px;margin-right:4px;border-radius:50%;background:#ff3d8b;color:#fff;text-align:center;font:700 11px var(--mono)}
 .lit{color:var(--short)} .shade{color:var(--dim)}
+#missionCard h3{margin-bottom:8px}
+.mdsel{display:flex;flex-wrap:wrap;gap:8px 12px;font-size:12px;color:var(--muted);margin-bottom:8px}
+.mdsel select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:12px var(--mono)}
+.md details{border-top:1px solid var(--line)}
+.md summary{cursor:pointer;padding:7px 2px;font-weight:600;font-size:13px;display:flex;gap:6px;align-items:center}
+.md summary::-webkit-details-marker{display:none}
+.md summary::before{content:'▸';color:var(--dim);font-size:11px}
+.md details[open] summary::before{content:'▾'}
+.md .badge{font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:1px 5px;border-radius:3px;border:1px solid var(--line);color:var(--dim)}
+.md .badge.sw{color:var(--short);border-color:color-mix(in srgb,var(--short) 50%,transparent)}
+.md .src{font-size:10.5px;color:var(--dim);margin:-2px 2px 6px;line-height:1.35}
+.md .rows{display:grid;grid-template-columns:minmax(0,1fr) auto;font-size:12px;margin-bottom:8px}
+.md .rows div{padding:4px 2px;border-bottom:1px dashed var(--line)}
+.md .rows .v{font-family:var(--mono);text-align:right}
+.md .rows .nd{color:var(--dim);font-style:italic}
+.md .note{font-size:11px;margin:0 2px 8px;color:var(--dim)}
+.md img{width:100%;border-radius:4px;border:1px solid var(--line);display:block;margin:2px 0 4px;background:var(--bg2)}
+.md ul{margin:0 0 8px;padding-left:16px;font-size:11.5px;color:var(--muted)}
+.md li{margin:2px 0}
 .infobox{margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg2);font-size:12.5px}
 .stats .sec{grid-column:1/-1;font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em;padding-top:10px}
 .warnbox{display:none;margin-top:10px;padding:10px;border-radius:9px;background:color-mix(in srgb,var(--danger) 12%,transparent);border:1px solid color-mix(in srgb,var(--danger) 45%,transparent);font-size:13px}
@@ -222,6 +241,14 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
         <h3>Route summary</h3>
         <div class="stats" id="stats"></div>
         <div class="note" style="margin-top:8px;font-size:12px">Slope source: CTX 20 m + partial HiRISE 1 m. The AI does not generate terrain values.</div>
+      </div>
+      <div class="card" id="missionCard">
+        <h3>Mission data</h3>
+        <div class="mdsel">
+          <label>Local time (LTST) <select id="mdHour"></select></label>
+          <label>Season <select id="mdLs"><option value="all">all</option><option value="0">Ls 0</option><option value="90">Ls 90</option><option value="180">Ls 180</option><option value="270">Ls 270</option></select></label>
+        </div>
+        <div class="md" id="missionBody"><div class="note">Loading…</div></div>
       </div>
       <div class="card" id="restCard">
         <h3>Rest stations along the route</h3>
@@ -411,6 +438,7 @@ const offscreen=document.createElement('canvas'), tileContext=offscreen.getConte
 const tileTexture=new THREE.CanvasTexture(offscreen); tileTexture.colorSpace=THREE.SRGBColorSpace;
 let terrainMesh=null, terrainImage=null, rangeMode='jezero', layer='elev';
 let T={h:new Float32Array(W*H),hMax:1,slope:new Float32Array(W*H),rock:new Float32Array(W*H),sand:new Float32Array(W*H)};
+let MISSION=null, missionLoaded=false, seasonLs='all';
 let routeMode='ab', BASE=null, pickingBase=false, ZONES=null, showZones=true, sunHour=13;
 let A=null, B=null, example=false, safe=null, routeLoading=false, routeError='';
 let terrainReady=false, hoverPoint=null, selectionPoint=null, hoverX=null, press=null, drag=null;
@@ -696,7 +724,7 @@ function showZonePopup(zone){
 }
 async function loadRestZones(){
   try{
-    const response=await fetch('/rest-zones?hour='+sunHour+(BASE?.available?`&baseLon=${BASE.lon}&baseLat=${BASE.lat}`:''));
+    const response=await fetch('/rest-zones?hour='+sunHour+(seasonLs==='all'?'':'&ls='+seasonLs)+(BASE?.available?`&baseLon=${BASE.lon}&baseLat=${BASE.lat}`:''));
     if(!response.ok) throw new Error();
     ZONES=await response.json();
     $('zoneSummary').textContent=`${ZONES.count} stations · sun ${f1(ZONES.sun.elevation_deg)}° · ${ZONES.zones.filter(z=>z.sunlit).length} sunlit`;
@@ -908,6 +936,84 @@ function onTravelInput(){
     }catch(error){}
   },250);
 }
+const esc=v=>String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mdVal(v,unit='',d=1){ return Number.isFinite(v)?`${f2(v,d)}${unit}`:'<span class="nd">no data</span>'; }
+function mdRange(a,b,unit='',d=1){ return Number.isFinite(a)&&Number.isFinite(b)?`${f2(a,d)}–${f2(b,d)}${unit}`:'<span class="nd">no data</span>'; }
+function mdSection(title,source,rows,{siteWide=false,note=null,extra='',open=true}={}){
+  return `<details${open?' open':''}><summary>${title}${siteWide?' <span class="badge sw">site-wide</span>':''}</summary>
+    <div class="src">Source: ${esc(source||'no data')}</div>
+    ${rows.length?`<div class="rows">${rows.map(([l,v])=>`<div>${l}</div><div class="v">${v}</div>`).join('')}</div>`:''}
+    ${extra}${note?`<div class="note">${esc(note)}</div>`:''}</details>`;
+}
+function renderMission(){
+  const box=$('missionBody'), M=MISSION;
+  if(!M){ box.innerHTML=`<div class="note">${missionLoaded?'Mission data unavailable.':'Loading…'}</div>`; return; }
+  const env=safe?.environment, opt=safe?.optimality, t=safe?.travel, rz=safe?.restZones, P=safe?.perseverance, alt=safe?.risk?.shortestAlternative;
+  const nd='<span class="nd">no data</span>';
+  const html=[];
+  html.push(mdSection('Route','Route engine (HiRISE 1 m / CTX 20 m terrain)',safe?[
+    ['Length',mdVal(env?.distance_m,' m',0)],['Surface distance',mdVal(env?.surface_distance_m,' m',0)],
+    ['Max slope',mdVal(env?.max_slope_deg,'°')],['Mean slope',mdVal(env?.mean_slope_deg,'°')],
+    ['Ascent',mdVal(env?.ascent_m,' m',0)],['Descent',mdVal(env?.descent_m,' m',0)],
+    ['Route mode',opt?(opt.startIsBase?'Base → B':'A → B'):nd],
+    ['Shortest alternative',alt?`${alt.distanceDifferenceFromChosen_m>0?'+':''}${f2(alt.distanceDifferenceFromChosen_m,0)} m vs chosen`:(safe?'same route':nd)]
+  ]:[['Route','<span class="nd">calculate a route</span>']]));
+  html.push(mdSection('Travel','Apollo LRV, NASA walk-back study',t?[
+    ['Rover distance',mdVal(t.drive_m/1000,' km',2)],['Walking distance',mdVal(t.walk_m,' m',0)],
+    ['Rover time',t.drive_time_hhmm?t.drive_time_hhmm+' h':nd],['Walking time',t.walk_time_hhmm?t.walk_time_hhmm+' h':nd],
+    ['Total time',t.total_time_hhmm?t.total_time_hhmm+' h':nd],['Arrival (LTST)',t.arrival_time_ltst||nd],
+    ['EVA window '+(t.eva_window_ltst||''),t.arrival_in_eva_window?'<span class="good">inside</span>':'<span class="bad">outside</span>'],
+    ['Walk-back ('+f1(t.walkback_limit_m/1000)+' km)',t.farthest_from_base_m==null?'<span class="nd">no base set</span>':(t.beyond_walkback_limit?'<span class="bad">beyond limit</span>':'<span class="good">within limit</span>')]
+  ]:[['Travel','<span class="nd">calculate a route</span>']]));
+  const T_=M.temperature;
+  html.push(mdSection('Temperature',T_.source,[
+    ['Air, median',T_.air?`${mdVal(T_.air.median_c,' °C')} · ${mdVal(T_.air.median_k,' K')}`:nd],
+    ['Air, p10–p90',T_.air?`${mdRange(T_.air.p10_c,T_.air.p90_c,' °C')} · ${mdRange(T_.air.p10_k,T_.air.p90_k,' K')}`:nd],
+    ['Ground, median',T_.ground?`${mdVal(T_.ground.median_c,' °C')} · ${mdVal(T_.ground.median_k,' K')}`:nd],
+    ['Ground, p10–p90',T_.ground?`${mdRange(T_.ground.p10_c,T_.ground.p90_c,' °C')} · ${mdRange(T_.ground.p10_k,T_.ground.p90_k,' K')}`:nd]
+  ],{siteWide:true}));
+  html.push(mdSection('Pressure',M.pressure.source,[['Median',mdVal(M.pressure.median_pa,' Pa')],['p10–p90',mdRange(M.pressure.p10_pa,M.pressure.p90_pa,' Pa')]],{siteWide:true,note:M.pressure.note}));
+  html.push(mdSection('Wind',M.wind.source,[['Median',mdVal(M.wind.median_m_s,' m/s',2)],['p90',mdVal(M.wind.p90_m_s,' m/s',2)]],{siteWide:true,note:M.wind.note}));
+  html.push(mdSection('Humidity',M.humidity.source,[['Relative humidity, median',mdVal(M.humidity.median_pct,' %',2)],['p90',mdVal(M.humidity.p90_pct,' %',2)]],{siteWide:true,note:M.humidity.note}));
+  html.push(mdSection('Dust',M.dust.source+(M.dust.license?' · '+M.dust.license:''),[['Scope',esc(M.dust.scope)],['Optical depth τ, median',mdVal(M.dust.median_tau,'',3)],['τ p90',mdVal(M.dust.p90_tau,'',3)]],{siteWide:true}));
+  html.push(mdSection('UV',M.uv.source,[['250–400 nm, median',mdVal(M.uv.median_w_m2,' W/m²',3)],['p90',mdVal(M.uv.p90_w_m2,' W/m²',3)]],{siteWide:true,note:M.uv.note}));
+  const S=M.sun;
+  html.push(mdSection('Sun',S.source,[
+    ['Elevation at '+String(S.hour_ltst).padStart(2,'0')+':00 ('+esc(S.season)+')',Number.isFinite(S.elevation_deg)?mdVal(S.elevation_deg,'°'):(S.elevation_range_deg?mdRange(S.elevation_range_deg.min_deg,S.elevation_range_deg.max_deg,'°')+' (all seasons)':nd)],
+    ['Measured geometry (MEDA)',S.measured_range_deg?mdRange(S.measured_range_deg.min_deg,S.measured_range_deg.max_deg,'°')+` (${S.measured_range_deg.sols} sols)`:nd],
+    ['Lowest in EVA window '+(S.eva_window_ltst||''),mdVal(S.eva_min_elevation_deg,'°')]
+  ]));
+  const R=M.radiation;
+  html.push(mdSection('Radiation',R.source,[
+    ['Dose rate',Number.isFinite(R.mgy_per_day)?`${f2(R.mgy_per_day,2)} ± ${f2(R.mgy_uncertainty,2)} mGy/day`:nd],
+    ['Dose equivalent',Number.isFinite(R.msv_per_day)?`${f2(R.msv_per_day,2)} ± ${f2(R.msv_uncertainty,2)} mSv/day`:nd],
+    ['This EVA',t&&Number.isFinite(t.eva_dose_msv)?mdVal(t.eva_dose_msv,' mSv',3):'<span class="nd">calculate a route</span>'],
+    ['Share of 600 mSv career limit',t&&Number.isFinite(t.eva_dose_pct_of_career_limit)?mdVal(t.eva_dose_pct_of_career_limit,' %',4):'<span class="nd">calculate a route</span>']
+  ],{siteWide:true,note:R.note+(R.measured_at?' ('+R.measured_at+')':'')}));
+  html.push(mdSection('Rest stations','Route engine',rz?[
+    ['Stations within '+f2(rz.near_route_limit_m/1000)+' km',String(rz.zones.length)],
+    ['Longest stretch without one',mdVal(rz.longest_gap_m/1000,' km',2)]
+  ]:[['Rest stations','<span class="nd">calculate a route</span>']]));
+  html.push(mdSection('Perseverance','NASA Raw Images',P?.available?[
+    ['Nearest waypoint',`sol ${P.sol} (site ${P.site}, drive ${P.drive})`],['Distance to route',mdVal(P.distance_m/1000,' km',2)]
+  ]:[['Nearest waypoint',safe?nd:'<span class="nd">calculate a route</span>']],{extra:P?.available&&P.image?.url_small?`<img src="${esc(P.image.url_small)}" alt="Perseverance ${esc(P.image.instrument||'')} image, sol ${P.sol}" loading="lazy"><div class="note">Image: ${esc(P.image.credit||'NASA')} · ${esc(P.image.instrument||'')} · sol ${P.sol}</div>`:''}));
+  html.push(mdSection('Sources','data/kaynaklar_v3.json',[],{open:false,extra:`<ul>${(M.sources||[]).map(x=>`<li>${esc(x.title)} — <span class="${x.license?'':'nd'}">${esc(x.license||'license: no data')}</span></li>`).join('')}</ul>`}));
+  box.innerHTML=html.join('');
+}
+async function loadMissionData(){
+  try{
+    const r=await fetch('/mission-data?hour='+sunHour+(seasonLs==='all'?'':'&ls='+seasonLs));
+    MISSION=r.ok?await r.json():null;
+  }catch(error){ MISSION=null; }
+  missionLoaded=true;
+  renderMission();
+}
+function setHourSeason(hour,ls){
+  sunHour=hour; seasonLs=ls;
+  $('sunHour').value=String(hour); $('mdHour').value=String(hour); $('mdLs').value=String(ls);
+  hidePopup(); loadRestZones(); loadMissionData();
+  if(safe){ routeDirty=true; renderGuide(); }
+}
 function renderReasons(){
   const list=$('reasons');
   list.replaceChildren();
@@ -968,7 +1074,7 @@ function renderGuide(){
 }
 
 /* ---------- route request ---------- */
-function updateAll(){ drawOverlay(); drawCharts(); renderStats(); renderTravel(); renderRestList(); renderReasons(); renderGuide(); }
+function updateAll(){ drawOverlay(); drawCharts(); renderStats(); renderTravel(); renderRestList(); renderMission(); renderReasons(); renderGuide(); }
 let routeRequestId=0;
 let routeDirty=true;
 function invalidateRoute(){
@@ -990,13 +1096,13 @@ async function requestRoute(){
   try{
     const response=await fetch('/route',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B}),base:BASE?.available?{lon:BASE.lon,lat:BASE.lat}:null,travel:travelSettingsFromInputs(),hour:sunHour})
+      body:JSON.stringify({...(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B}),base:BASE?.available?{lon:BASE.lon,lat:BASE.lat}:null,travel:travelSettingsFromInputs(),hour:sunHour,ls:seasonLs==='all'?null:Number(seasonLs)})
     });
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Route request failed.');
     if(requestId!==routeRequestId) return;
     if(data.route.length){
-      safe={points:data.route,profile:data.profile,optimality:data.optimality,environment:data.environment,why:data.narration?.why||'AI route explanation unavailable.',factors:data.narration?.factors||[],navigation:data.narration?.navigation||'',fallback:!!data.fallback,routeWarning:data.routeWarning,travel:data.travel,restZones:data.restZones};
+      safe={points:data.route,profile:data.profile,optimality:data.optimality,environment:data.environment,why:data.narration?.why||'AI route explanation unavailable.',factors:data.narration?.factors||[],navigation:data.narration?.navigation||'',fallback:!!data.fallback,routeWarning:data.routeWarning,travel:data.travel,restZones:data.restZones,risk:data.risk,perseverance:data.perseverance};
       routeLoading=false;
       updateAll();
       if(data.narrationError) routeError=`Route calculated; AI summary unavailable: ${data.narrationError}`;
@@ -1197,7 +1303,11 @@ $('popupClose').addEventListener('click',hidePopup);
 $('setBase').addEventListener('click',()=>{ pickingBase=!pickingBase; hidePopup(); renderGuide(); });
 $('resetBase').addEventListener('click',resetBase);
 for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+':00'; if(h===sunHour) o.selected=true; $('sunHour').append(o); }
-$('sunHour').addEventListener('change',()=>{ sunHour=Number($('sunHour').value); hidePopup(); loadRestZones(); if(safe){ routeDirty=true; renderGuide(); } });
+$('sunHour').addEventListener('change',()=>setHourSeason(Number($('sunHour').value),seasonLs));
+for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+':00'; if(h===sunHour) o.selected=true; $('mdHour').append(o); }
+$('mdHour').addEventListener('change',()=>setHourSeason(Number($('mdHour').value),seasonLs));
+$('mdLs').addEventListener('change',()=>setHourSeason(sunHour,$('mdLs').value));
+loadMissionData();
 $('zonesToggle').addEventListener('change',()=>{ showZones=$('zonesToggle').checked; hidePopup(); drawOverlay(); renderLegend(); });
 $('tStart').addEventListener('input',onTravelInput);
 async function loadTravelParameters(){
