@@ -298,8 +298,22 @@ renderer.setSize(880,880,false); renderer.outputColorSpace=THREE.SRGBColorSpace;
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0x050607);
 const camera=new THREE.PerspectiveCamera(36,1,0.0001,20);
 const controls=new OrbitControls(camera,renderer.domElement);
-controls.enablePan=false; controls.enableDamping=true; controls.dampingFactor=0.06;
+controls.enablePan=false; controls.enableDamping=true; controls.dampingFactor=0.12;
 controls.minDistance=1.00015; controls.maxDistance=5;
+// Altitude-scaled input (globe radius = 1). OrbitControls rotates 2π·rotateSpeed per canvas height of drag,
+// while the visible ground spans about 2·h·tan(fov/2) ≈ 0.65·h radians, so rotateSpeed ≈ 0.10·h keeps the
+// ground under the cursor. 0.12·h is just above that: precise near Jezero, normal when far away.
+// Each wheel notch multiplies distance-to-centre by 0.95^zoomSpeed; solve for ≈10% altitude change per notch.
+const ROTATE_K=0.12, ROTATE_MIN=0.00001, ROTATE_MAX=0.8, ZOOM_STEP=0.10, ZOOM_MAX=0.6;
+function scaleControls(){
+  const d=camera.position.length(), h=Math.max(d-1,0.00001);
+  controls.rotateSpeed=Math.min(ROTATE_MAX,Math.max(ROTATE_MIN,ROTATE_K*h));
+  // OrbitControls divides wheel delta by 100·devicePixelRatio; undo that so a notch is the same on retina screens.
+  const dpr=Math.max(1,window.devicePixelRatio|0);
+  controls.zoomSpeed=dpr*Math.min(ZOOM_MAX,Math.max(0.000001,Math.log(1-ZOOM_STEP*h/d)/Math.log(0.95)));
+}
+// Refresh before OrbitControls handles each event too, so fast wheel bursts never use a stale speed.
+['wheel','pointerdown','pointermove'].forEach(type=>canvas.parentElement.addEventListener(type,scaleControls,{capture:true,passive:true}));
 const ambient=new THREE.AmbientLight(0xffffff,0.8); scene.add(ambient);
 const sun=new THREE.DirectionalLight(0xffffff,2.1); sun.position.set(-2,3,4); scene.add(sun);
 const globeGroup=new THREE.Group(); scene.add(globeGroup);
@@ -380,7 +394,7 @@ function updateScale(){
   $('scaleLabel').textContent=label;
   $('scaleBar').style.width=`${width}px`;
 }
-function animateGlobe(){requestAnimationFrame(animateGlobe);controls.update();renderer.render(scene,camera);}
+function animateGlobe(){requestAnimationFrame(animateGlobe);scaleControls();controls.update();renderer.render(scene,camera);}
 controls.addEventListener('change',updateScale);
 
 function renderLegend(){
