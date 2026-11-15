@@ -7,7 +7,7 @@ const path = require('node:path');
 const DATA = path.join(__dirname, 'data');
 function load(name) {
     try { return JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8')); }
-    catch (error) { console.warn(`data/${name} okunamadi: ${error.message}`); return null; }
+    catch (error) { console.warn(`data/${name} could not be read: ${error.message}`); return null; }
 }
 const env = load('environment_meda.json');
 const sun = load('sun_elevation.json');
