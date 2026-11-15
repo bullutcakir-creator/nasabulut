@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { weatherFor, waypointImagesFor, trekLayers } = require('./weather');
-const { snapBase, computeTravel, farthestFromBase } = require('./planning');
+const { snapBase, computeTravel, farthestFromBase, travelParameters } = require('./planning');
 const { createRestZones, zonesNearRoute } = require('./restzones');
 
 const app = express();
@@ -833,6 +833,7 @@ app.get('/weather', (req, res) => {
 app.get('/waypoint-images', (req, res) => {
     res.json(waypointImagesFor(req.query.site, req.query.drive));
 });
+app.get('/travel-parameters', (req, res) => res.json(travelParameters()));
 app.post('/travel', async (req, res) => {
     const length = Number(req.body?.route_length_m);
     if (!Number.isFinite(length) || length < 0) return res.status(400).json({ error: 'route_length_m must be a non-negative number' });

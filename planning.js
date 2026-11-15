@@ -53,28 +53,40 @@ const TRAVEL_DEFAULTS = Object.freeze({
     walkback_limit_m: 10000, // Apollo-derived walk-back limit (NASA JSC 10 km Walkback Test)
     start_hour: 11         // LTST; EVA window below
 });
-const TRAVEL_LIMITS = Object.freeze({ rover_kmh: [0.5, 20], walk_kmh: [0.5, 8], walk_m: [0, 2000], start_hour: [0, 23.99] });
+// Only the departure time can be chosen; speeds, walking distance and the walk-back limit are fixed constants.
+const USER_SETTABLE = Object.freeze({ start_hour: [0, 23.99] });
 const EVA_WINDOW = Object.freeze({ start_hour: 11, end_hour: 15 });
 const CAREER_LIMIT_MSV = 600; // NASA-STD-3001 Vol. 1 career effective dose limit
 const TRAVEL_SOURCES = Object.freeze({
     rover_kmh: 'Apollo LRV design speed 9-13 km/h; Apollo 15/16 actual averages were lower (NASA NTRS 20250011301)',
     walk_kmh: '2.2 mph, highest nominal Apollo walking speed (NASA ICES-2026, Mars Spacesuit Mass Requirements)',
-    walk_m: 'Team assumption; adjustable 0-2000 m',
+    walk_m: 'Team assumption',
     walkback_limit_m: 'Apollo-derived walk-back limit (NASA JSC 10 km Walkback Test)',
     radiation: 'Curiosity RAD, Gale crater (Hassler et al. 2014); no Jezero measurement exists',
     career_limit: 'NASA-STD-3001 career limit 600 mSv'
 });
 
+/** Locked constants; request values for speeds and distances are ignored. Only start_hour is read from the input. */
 function travelSettings(input = {}) {
-    const out = {};
-    for (const [key, fallback] of Object.entries(TRAVEL_DEFAULTS)) {
+    const out = { ...TRAVEL_DEFAULTS };
+    for (const [key, [min, max]] of Object.entries(USER_SETTABLE)) {
         const value = Number(input?.[key]);
-        const limits = TRAVEL_LIMITS[key];
-        out[key] = Number.isFinite(value) && input?.[key] !== '' && input?.[key] !== null
-            ? (limits ? Math.min(limits[1], Math.max(limits[0], value)) : value)
-            : fallback;
+        if (input?.[key] !== '' && input?.[key] !== null && Number.isFinite(value)) out[key] = Math.min(max, Math.max(min, value));
     }
     return out;
+}
+function travelParameters() {
+    return {
+        locked: {
+            rover_kmh: TRAVEL_DEFAULTS.rover_kmh,
+            walk_kmh: TRAVEL_DEFAULTS.walk_kmh,
+            walk_m: TRAVEL_DEFAULTS.walk_m,
+            walkback_limit_m: TRAVEL_DEFAULTS.walkback_limit_m
+        },
+        default_start_hour: TRAVEL_DEFAULTS.start_hour,
+        eva_window: EVA_WINDOW,
+        sources: TRAVEL_SOURCES
+    };
 }
 const round = (x, n = 0) => { const f = 10 ** n; return Math.round(x * f) / f; };
 function hhmm(hours) {
@@ -152,4 +164,4 @@ function farthestFromBase(coordinates, base, terrain) {
     return max;
 }
 
-module.exports = { snapBase, computeTravel, farthestFromBase, travelSettings, TRAVEL_DEFAULTS };
+module.exports = { snapBase, computeTravel, farthestFromBase, travelSettings, travelParameters, TRAVEL_DEFAULTS };
