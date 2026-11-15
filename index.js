@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { weatherFor, waypointImagesFor, trekLayers } = require('./weather');
-const { computeBase, computeTravel, farthestFromBase } = require('./planning');
+const { snapBase, computeTravel, farthestFromBase } = require('./planning');
 const { createRestZones, zonesNearRoute } = require('./restzones');
 
 const app = express();
@@ -13,15 +13,15 @@ const pathingModulePromise = import(pathToFileURL(path.join(__dirname, 'pathing/
 const pathingTerrainPromise = pathingModulePromise.then(({ Terrain }) => Terrain.load(path.join(__dirname, 'pathing/src/build')));
 // Rest / emergency zones, computed once from the terrain grid.
 const restZonesPromise = pathingTerrainPromise.then(createRestZones);
-// Base camp at the map centre, computed once from the terrain grid.
-const basePromise = pathingTerrainPromise.then(terrain => {
-    const base = computeBase(terrain);
+// Base camp is chosen by the user (POST /base); the server snaps it to the nearest passable cell.
+async function resolveBase(input) {
+    const lon = Number(input?.lon), lat = Number(input?.lat);
+    if (input == null || !Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+    const terrain = await pathingTerrainPromise;
+    const base = snapBase(terrain, lon, lat);
     if (base.available) base.point = lonLatToFrontendPoint([base.lon, base.lat], terrain);
-    console.log(base.available
-        ? `Base camp: lat ${base.lat.toFixed(5)}, lon ${base.lon.toFixed(5)} (cell ${base.row},${base.col})${base.adjusted ? `, moved ${base.adjustment_m} m from the map centre` : ', exact map centre'}`
-        : `Base camp unavailable: ${base.note}`);
     return base;
-});
+}
 const systemPrompt = 'You are a helpful assistant. Respond clearly and accurately.';
 const navigationSystemPrompt = [
     'You are a practical Mars rover route analyst. Write all user-facing text in English.',
@@ -669,8 +669,8 @@ function restZonesForAi(restZones) {
 app.post('/route', async (req, res) => {
     const { end } = req.body;
     const startBase = req.body.startBase === true;
-    const base = startBase ? await basePromise.catch(() => null) : null;
-    if (startBase && !base?.available) return res.status(503).json({ error: 'Base camp is unavailable' });
+    const base = await resolveBase(req.body.base).catch(() => null);
+    if (startBase && !base?.available) return res.status(400).json({ error: 'Set a base first' });
     const start = startBase ? base.point : req.body.start;
     const hour = Number.isFinite(Number(req.body.hour)) ? Number(req.body.hour) : 13;
     const ls = Number.isFinite(Number(req.body.ls)) && req.body.ls !== null && req.body.ls !== '' ? Number(req.body.ls) : null;
@@ -711,7 +711,7 @@ app.post('/route', async (req, res) => {
             weather: weatherFor({ hour, ls }),
             soil_strength: 'unavailable; not used in routing'
         };
-        const baseCamp = base || await basePromise.catch(() => null);
+        const baseCamp = base?.available ? base : null;
         const restZoneModel = await restZonesPromise;
         const lit = restZoneModel.withSun(hour, ls);
         const near = zonesNearRoute(lit.zones, balanced.geometry.coordinates, pathingTerrain, baseCamp);
@@ -849,7 +849,8 @@ app.get('/rest-zones', async (req, res) => {
     try {
         const hour = Number.isFinite(Number(req.query.hour)) && req.query.hour !== '' ? Number(req.query.hour) : 13;
         const ls = req.query.ls ?? null;
-        const [model, terrain, base] = await Promise.all([restZonesPromise, pathingTerrainPromise, basePromise.catch(() => null)]);
+        const [model, terrain, base] = await Promise.all([restZonesPromise, pathingTerrainPromise,
+            resolveBase(req.query.baseLon != null ? { lon: req.query.baseLon, lat: req.query.baseLat } : null).catch(() => null)]);
         const { sun, zones } = model.withSun(hour, ls);
         return res.json({
             count: zones.length,
@@ -868,12 +869,13 @@ app.get('/rest-zones', async (req, res) => {
         return res.status(500).json({ error: 'Unable to compute rest zones', details: error.message });
     }
 });
-app.get('/base', async (req, res) => {
+app.post('/base', async (req, res) => {
     try {
-        const base = await basePromise;
-        return res.status(base.available ? 200 : 503).json(base);
+        const base = await resolveBase(req.body);
+        if (!base) return res.status(400).json({ error: 'lon and lat are required' });
+        return res.status(base.available ? 200 : 422).json(base);
     } catch (error) {
-        return res.status(500).json({ error: 'Unable to compute base camp', details: error.message });
+        return res.status(500).json({ error: 'Unable to set base camp', details: error.message });
     }
 });
 app.get('/trek-layers', (req, res) => {

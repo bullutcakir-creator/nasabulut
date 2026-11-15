@@ -172,6 +172,8 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
             <button data-range="jezero" class="on">Jezero</button>
             <button data-range="mars">Mars</button>
           </div>
+          <button class="btn" id="setBase" type="button" aria-pressed="false" title="Click this, then click the map or globe to place the base camp">Set base</button>
+          <button class="btn" id="resetBase" type="button" title="Remove the base camp">Reset base</button>
           <button class="btn" id="setA" title="Set the last terrain point under the cursor as the start">Set A</button>
           <button class="btn" id="setB" title="Set the last terrain point under the cursor as the destination">Set B</button>
           <button class="btn" id="clear">Clear</button>
@@ -394,7 +396,7 @@ const offscreen=document.createElement('canvas'), tileContext=offscreen.getConte
 const tileTexture=new THREE.CanvasTexture(offscreen); tileTexture.colorSpace=THREE.SRGBColorSpace;
 let terrainMesh=null, terrainImage=null, rangeMode='jezero', layer='elev';
 let T={h:new Float32Array(W*H),hMax:1,slope:new Float32Array(W*H),rock:new Float32Array(W*H),sand:new Float32Array(W*H)};
-let routeMode='ab', BASE=null, ZONES=null, showZones=true, sunHour=13;
+let routeMode='ab', BASE=null, pickingBase=false, ZONES=null, showZones=true, sunHour=13;
 let A=null, B=null, example=false, safe=null, routeLoading=false, routeError='';
 let terrainReady=false, hoverPoint=null, selectionPoint=null, hoverX=null, press=null, drag=null;
 
@@ -612,7 +614,7 @@ function showZonePopup(zone){
 }
 async function loadRestZones(){
   try{
-    const response=await fetch('/rest-zones?hour='+sunHour);
+    const response=await fetch('/rest-zones?hour='+sunHour+(BASE?.available?`&baseLon=${BASE.lon}&baseLat=${BASE.lat}`:''));
     if(!response.ok) throw new Error();
     ZONES=await response.json();
     $('zoneSummary').textContent=`${ZONES.count} zones · sun ${f1(ZONES.sun.elevation_deg)}° · ${ZONES.zones.filter(z=>z.sunlit).length} sunlit`;
@@ -673,7 +675,7 @@ function showBasePopup(){
     <div>Grid cell (row, col)</div><div class="v">${BASE.row}, ${BASE.col}</div>
     <div>Elevation (MOLA datum)</div><div class="v">${fm(BASE.elevation_m)} m</div>
     <div>Max slope in cell</div><div class="v">${f1(BASE.slope_max_deg)}°</div></div>
-    <div class="muted">${BASE.adjusted?`Moved ${fm(BASE.adjustment_m)} m from the exact map centre: ${BASE.adjustment_reason}`:'Exact centre cell of the terrain grid (passable).'}</div>`);
+    <div class="muted">${BASE.adjusted?`Moved ${fm(BASE.adjustment_m)} m from the clicked point to the nearest passable cell: ${BASE.adjustment_reason}`:'The selected point is passable.'}</div>`);
 }
 function drawOverlay(){
   while(overlayGroup.children.length){
@@ -860,7 +862,8 @@ function renderReasons(){
 }
 function renderGuide(){
   const g=$('guide');
-  if(routeMode==='base'&&!BASE?.available) g.innerHTML='<b>Base camp unavailable.</b> Switch to A → B mode.';
+  if(pickingBase) g.innerHTML='<b>Set base:</b> Click the map or globe to place the base camp. Unsafe points move to the nearest passable cell.';
+  else if(routeMode==='base'&&!BASE?.available) g.innerHTML='<b>Set a base first.</b> Press Set base and click the map, or switch to A → B mode.';
   else if(routeMode==='base'&&!B) g.innerHTML='<b>Base → B:</b> The route starts at the base camp. Click the map or press Set B to pick the destination.';
   else if(!A) g.innerHTML='<b>Start:</b> Point at a location on the map; press Set A or the A key.';
   else if(!B) g.innerHTML='<b>Destination:</b> Point at a new location; press Set B or the B key.';
@@ -876,8 +879,11 @@ function renderGuide(){
   else g.innerHTML='<b>No route found.</b> Change the settings and try again.';
   $('swap').disabled=!(A&&B)||routeMode==='base'; $('clear').disabled=routeMode==='base'?!B:!A; $('cRoute').disabled=!safe;
   $('setA').disabled=!selectionPoint||routeMode==='base'; $('setB').disabled=!selectionPoint;
-  $('calculate').disabled=!(A&&B)||routeLoading||!terrainReady;
-  $('calculate').textContent=routeLoading?'Calculating…':routeDirty?'Calculate':'Recalculate';
+  const needBase=routeMode==='base'&&!BASE?.available;
+  $('calculate').disabled=needBase||!(A&&B)||routeLoading||!terrainReady;
+  $('calculate').textContent=needBase?'Set a base first':routeLoading?'Calculating…':routeDirty?'Calculate':'Recalculate';
+  $('setBase').setAttribute('aria-pressed',String(pickingBase)); $('setBase').textContent=pickingBase?'Click the map…':'Set base';
+  $('resetBase').disabled=!BASE?.available;
 }
 
 /* ---------- route request ---------- */
@@ -903,7 +909,7 @@ async function requestRoute(){
   try{
     const response=await fetch('/route',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B}),travel:travelSettingsFromInputs(),hour:sunHour})
+      body:JSON.stringify({...(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B}),base:BASE?.available?{lon:BASE.lon,lat:BASE.lat}:null,travel:travelSettingsFromInputs(),hour:sunHour})
     });
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Route request failed.');
@@ -920,13 +926,35 @@ async function requestRoute(){
     if(requestId===routeRequestId){ routeLoading=false; updateAll(); }
   }
 }
-async function loadBase(){
+async function placeBase(lon,lat){
   try{
-    const response=await fetch('/base');
-    BASE=await response.json();
-    if(!response.ok) BASE={available:false};
-  }catch(error){ BASE={available:false}; }
-  if(routeMode==='base'&&BASE.available) A={...BASE.point};
+    const response=await fetch('/base',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lon,lat})});
+    const data=await response.json();
+    BASE=response.ok&&data.available?data:null;
+  }catch(error){ BASE=null; }
+  return BASE;
+}
+async function loadBase(){
+  // the base is the user's choice, kept in this browser; the server re-checks it on load
+  let saved=null;
+  try{ saved=JSON.parse(localStorage.getItem('base')||'null'); }catch(error){ saved=null; }
+  BASE=null;
+  if(saved&&Number.isFinite(saved.lon)&&Number.isFinite(saved.lat)) await placeBase(saved.lon,saved.lat);
+  if(routeMode==='base') A=BASE?{...BASE.point}:null;
+}
+async function setBaseAt(lon,lat){
+  pickingBase=false;
+  const base=await placeBase(lon,lat);
+  if(base){ try{ localStorage.setItem('base',JSON.stringify({lon:base.lon,lat:base.lat})); }catch(error){} }
+  if(routeMode==='base'){ A=base?{...base.point}:null; if(A&&B&&A.x===B.x&&A.y===B.y) B=null; }
+  invalidateRoute(); loadRestZones();
+  if(base) showBasePopup(); else showPopup('<h4>Base not set</h4><div class="muted">No passable cell near that point. Try another location.</div>');
+}
+function resetBase(){
+  BASE=null; pickingBase=false;
+  try{ localStorage.removeItem('base'); }catch(error){}
+  if(routeMode==='base') A=null;
+  hidePopup(); invalidateRoute(); loadRestZones();
 }
 async function loadRealTerrain(){
   terrainReady=false; updateAll();
@@ -987,7 +1015,7 @@ function nearMarker(point){
 function updateHover(hit,event){
   const point=hit?hitToPoint(hit):null;
   hoverPoint=point;
-  canvas.style.cursor=baseScreenDistance(event)<22?'pointer':'';
+  canvas.style.cursor=pickingBase?'crosshair':baseScreenDistance(event)<22?'pointer':'';
   if(point) selectionPoint={x:point.x,y:point.y};
   if(point){const geo=pointToGeo(point);hoverMesh.position.copy(geoVector(geo.lon,geo.lat,1.0008));hoverMesh.visible=true;}
   else hoverMesh.visible=false;
@@ -1023,6 +1051,11 @@ function endGlobePointer(event){
   press=null;drag=null;controls.enabled=true;
   if(dragged){if(moved)invalidateRoute();return;}
   if(moved||event.type==='pointercancel')return;
+  if(pickingBase){
+    const hit=hitTerrain(event), p=hit?.point?.clone().normalize();
+    if(p) setBaseAt(Math.atan2(p.x,p.z)*DEG,Math.asin(clamp(p.y,-1,1))*DEG);
+    return;
+  }
   if(baseScreenDistance(event)<22){ showBasePopup(); return; }
   const point=selectedPoint;
   if(!point)return;
@@ -1081,11 +1114,13 @@ document.querySelectorAll('#mode button').forEach(button=>button.addEventListene
   example=false; invalidateRoute();
 }));
 $('popupClose').addEventListener('click',hidePopup);
+$('setBase').addEventListener('click',()=>{ pickingBase=!pickingBase; hidePopup(); renderGuide(); });
+$('resetBase').addEventListener('click',resetBase);
 for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+':00'; if(h===sunHour) o.selected=true; $('sunHour').append(o); }
 $('sunHour').addEventListener('change',()=>{ sunHour=Number($('sunHour').value); hidePopup(); loadRestZones(); if(safe){ routeDirty=true; renderGuide(); } });
 $('zonesToggle').addEventListener('click',()=>{ showZones=!showZones; $('zonesToggle').setAttribute('aria-pressed',String(showZones)); hidePopup(); drawOverlay(); renderLegend(); });
 ['tRover','tWalk','tWalkM','tLimit','tStart'].forEach(id=>$(id).addEventListener('input',onTravelInput));
-document.addEventListener('keydown',event=>{ if(event.key==='Escape') hidePopup(); });
+document.addEventListener('keydown',event=>{ if(event.key==='Escape'){ hidePopup(); if(pickingBase){ pickingBase=false; renderGuide(); } } });
 $('calculate').addEventListener('click',()=>{
   if(!(A&&B)||routeLoading) return;
   requestRoute();

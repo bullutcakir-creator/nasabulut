@@ -5,40 +5,42 @@
 const MAX_BASE_SEARCH_RINGS = 60; // 60 cells = 3.6 km search radius for a passable base cell
 
 /**
- * Base camp = exact centre cell of the terrain grid. If that cell fails the engine's own endpoint check
+ * Base camp chosen by the user. If the clicked cell fails the engine's own endpoint check
  * (too steep, unknown terrain, or safety buffer), move to the nearest cell (ground distance) that passes.
  */
-function computeBase(terrain) {
-    const row0 = Math.floor(terrain.H / 2), col0 = Math.floor(terrain.W / 2);
+function snapBase(terrain, lon, lat) {
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) return { available: false, note: 'lon/lat must be finite numbers.' };
+    const [row0, col0] = terrain.cellOf(lon, lat);
+    if (!(row0 >= 0 && row0 < terrain.H && col0 >= 0 && col0 < terrain.W)) return { available: false, note: 'The point is outside the terrain grid.' };
     const [lon0, lat0] = terrain.cellCenterLonLat(row0, col0);
-    const centreProblem = terrain.checkPoint(row0, col0);
-    let best = centreProblem ? null : { row: row0, col: col0, d: 0 };
+    const problem = terrain.checkPoint(row0, col0);
+    let best = problem ? null : { row: row0, col: col0, d: 0 };
     for (let ring = 1; !best && ring <= MAX_BASE_SEARCH_RINGS; ring++) {
         for (let dr = -ring; dr <= ring; dr++) {
             for (let dc = -ring; dc <= ring; dc++) {
                 if (Math.max(Math.abs(dr), Math.abs(dc)) !== ring) continue;
                 const r = row0 + dr, c = col0 + dc;
                 if (terrain.checkPoint(r, c)) continue;
-                const [lon, lat] = terrain.cellCenterLonLat(r, c);
-                const d = terrain.groundDistance(lon0, lat0, lon, lat);
+                const [clon, clat] = terrain.cellCenterLonLat(r, c);
+                const d = terrain.groundDistance(lon0, lat0, clon, clat);
                 if (!best || d < best.d) best = { row: r, col: c, d };
             }
         }
     }
-    if (!best) return { available: false, note: `No passable cell within ${MAX_BASE_SEARCH_RINGS} cells of the map centre.` };
-    const [lon, lat] = terrain.cellCenterLonLat(best.row, best.col);
+    if (!best) return { available: false, note: `No passable cell within ${MAX_BASE_SEARCH_RINGS} cells of the selected point.` };
+    const [blon, blat] = terrain.cellCenterLonLat(best.row, best.col);
     const i = best.row * terrain.W + best.col;
     return {
         available: true,
         name: 'Base',
-        lon, lat,
+        lon: blon, lat: blat,
         row: best.row, col: best.col,
         elevation_m: terrain.elev[i],
         slope_max_deg: terrain.slopeMax[i],
-        map_centre: { lon: lon0, lat: lat0, row: row0, col: col0 },
-        adjusted: !!centreProblem,
+        requested: { lon, lat, row: row0, col: col0 },
+        adjusted: !!problem,
         adjustment_m: Math.round(best.d),
-        adjustment_reason: centreProblem ? centreProblem[1] : null
+        adjustment_reason: problem ? problem[1] : null
     };
 }
 
@@ -150,4 +152,4 @@ function farthestFromBase(coordinates, base, terrain) {
     return max;
 }
 
-module.exports = { computeBase, computeTravel, farthestFromBase, travelSettings, TRAVEL_DEFAULTS };
+module.exports = { snapBase, computeTravel, farthestFromBase, travelSettings, TRAVEL_DEFAULTS };
