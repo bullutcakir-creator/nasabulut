@@ -57,6 +57,15 @@ section{padding:34px 0;border-top:1px solid var(--line)}
 #guide{margin:0 0 7px;background:transparent;border-left:2px solid var(--accent);padding:5px 9px;font-size:13px;line-height:1.35}
 #guide b{color:var(--accent)}
 #tip{position:absolute;pointer-events:none;background:var(--tip-bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:12px/1.45 var(--mono);display:none;white-space:nowrap;z-index:3}
+#popup{position:absolute;top:10px;right:10px;width:min(300px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12.5px;z-index:4;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+#popup[hidden]{display:none}
+#popup h4{margin:0 26px 6px 0;font-size:14px}
+#popup .close{position:absolute;top:6px;right:6px;width:24px;height:24px;padding:0;line-height:20px}
+#popup .kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px}
+#popup .kv div{padding:3px 0;border-bottom:1px solid var(--line)}
+#popup .kv .v{font-family:var(--mono);text-align:right}
+#popup .tag{margin-top:8px;font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+#popup .muted{color:var(--muted);margin-top:6px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:10px 4px 2px;font-size:12.5px;color:var(--muted)}
 .legend .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .legend .grad{display:inline-block;width:110px;height:9px;border-radius:3px;vertical-align:middle;margin:0 6px}
@@ -139,6 +148,10 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
           <button data-l="haz">Hazard</button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="seg" id="mode" title="Route start">
+            <button data-mode="ab" class="on">A → B</button>
+            <button data-mode="base">Base → B</button>
+          </div>
           <div class="seg" id="range">
             <button data-range="jezero" class="on">Jezero</button>
             <button data-range="mars">Mars</button>
@@ -154,6 +167,7 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
         <canvas id="globe" tabindex="0" aria-label="Mars globe and Jezero terrain map"></canvas>
         <div id="scale"><span id="scaleLabel">--</span><div class="bar" id="scaleBar"></div></div>
         <div id="tip"></div>
+        <div id="popup" role="dialog" aria-live="polite" hidden><button class="btn close" id="popupClose" type="button" aria-label="Close">×</button><div id="popupBody"></div></div>
       </div>
       <div class="legend" id="legend"></div>
       <div class="hint">Point at the terrain and press A to mark the start, B to mark the destination. Drag the globe to rotate it.</div>
@@ -339,6 +353,7 @@ const offscreen=document.createElement('canvas'), tileContext=offscreen.getConte
 const tileTexture=new THREE.CanvasTexture(offscreen); tileTexture.colorSpace=THREE.SRGBColorSpace;
 let terrainMesh=null, terrainImage=null, rangeMode='jezero', layer='elev';
 let T={h:new Float32Array(W*H),hMax:1,slope:new Float32Array(W*H),rock:new Float32Array(W*H),sand:new Float32Array(W*H)};
+let routeMode='ab', BASE=null;
 let A=null, B=null, example=false, safe=null, routeLoading=false, routeError='';
 let terrainReady=false, hoverPoint=null, selectionPoint=null, hoverX=null, press=null, drag=null;
 
@@ -487,6 +502,48 @@ function addMarker(point,label,color){
   sprite.position.copy(position.clone().normalize().multiplyScalar(position.length()+0.0002));
   sprite.scale.setScalar(0.00055);overlayGroup.add(sprite);
 }
+function baseSurfacePoint(){
+  const point=routeSurfacePoint(BASE.point), geo={lon:BASE.lon,lat:BASE.lat};
+  return geoVector(geo.lon,geo.lat,point.length());
+}
+function addBaseMarker(){
+  if(!BASE?.available) return;
+  const c=document.createElement('canvas'); c.width=128; c.height=128;
+  const g=c.getContext('2d');
+  // house-shaped icon (distinct from round A/B markers) with a "Base" label
+  g.fillStyle='#ffd27a'; g.strokeStyle='#111'; g.lineWidth=5;
+  g.beginPath(); g.moveTo(64,10); g.lineTo(108,46); g.lineTo(96,46); g.lineTo(96,84); g.lineTo(32,84); g.lineTo(32,46); g.lineTo(20,46); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle='#111'; g.fillRect(56,58,16,26);
+  g.font='700 30px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.lineWidth=6; g.strokeStyle='#111'; g.strokeText('Base',64,108); g.fillStyle='#ffd27a'; g.fillText('Base',64,108);
+  const texture=new THREE.CanvasTexture(c); texture.colorSpace=THREE.SRGBColorSpace;
+  // sizeAttenuation:false keeps the marker the same size on screen at every zoom level
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:true,depthWrite:false,sizeAttenuation:false}));
+  const position=baseSurfacePoint();
+  sprite.position.copy(position.clone().normalize().multiplyScalar(position.length()+0.0002));
+  sprite.center.set(0.5,0.15); sprite.scale.setScalar(0.075); sprite.renderOrder=5; sprite.name='base';
+  overlayGroup.add(sprite);
+}
+function baseScreenDistance(event){
+  if(!BASE?.available) return Infinity;
+  const rect=canvas.getBoundingClientRect(), p=baseSurfacePoint().project(camera);
+  if(p.z>1) return Infinity;
+  const x=(p.x+1)/2*rect.width+rect.left, y=(1-p.y)/2*rect.height+rect.top;
+  // the icon sits above its anchor point, so also accept clicks on the icon body
+  return Math.min(Math.hypot(event.clientX-x,event.clientY-y),Math.hypot(event.clientX-x,event.clientY-(y-0.05*rect.height)));
+}
+const fLat=v=>`${Math.abs(v).toFixed(5)}° ${v>=0?'N':'S'}`, fLon=v=>`${Math.abs(v).toFixed(5)}° ${v>=0?'E':'W'}`;
+function showPopup(html){ $('popupBody').innerHTML=html; $('popup').hidden=false; }
+function hidePopup(){ $('popup').hidden=true; }
+function showBasePopup(){
+  if(!BASE?.available) return;
+  showPopup(`<h4>Base camp</h4><div class="kv">
+    <div>Latitude</div><div class="v">${fLat(BASE.lat)}</div>
+    <div>Longitude</div><div class="v">${fLon(BASE.lon)}</div>
+    <div>Grid cell (row, col)</div><div class="v">${BASE.row}, ${BASE.col}</div>
+    <div>Elevation (MOLA datum)</div><div class="v">${fm(BASE.elevation_m)} m</div>
+    <div>Max slope in cell</div><div class="v">${f1(BASE.slope_max_deg)}°</div></div>
+    <div class="muted">${BASE.adjusted?`Moved ${fm(BASE.adjustment_m)} m from the exact map centre: ${BASE.adjustment_reason}`:'Exact centre cell of the terrain grid (passable).'}</div>`);
+}
 function drawOverlay(){
   while(overlayGroup.children.length){
     const item=overlayGroup.children.pop(); overlayGroup.remove(item);
@@ -513,8 +570,9 @@ function drawOverlay(){
     const material=new THREE.MeshBasicMaterial({color:safe.fallback?0xff705e:0x69d7e8});
     overlayGroup.add(new THREE.Mesh(geometry,material));
   }
-  if(A) addMarker(A,'A',0x7dff9b);
+  if(A&&routeMode==='ab') addMarker(A,'A',0x7dff9b);
   if(B) addMarker(B,'B',0xff7a3d);
+  addBaseMarker();
 }
 
 loadGlobeTexture(); setCamera(1.026); resizeGlobe(); animateGlobe();
@@ -630,7 +688,9 @@ function renderReasons(){
 }
 function renderGuide(){
   const g=$('guide');
-  if(!A) g.innerHTML='<b>Start:</b> Point at a location on the map; press Set A or the A key.';
+  if(routeMode==='base'&&!BASE?.available) g.innerHTML='<b>Base camp unavailable.</b> Switch to A → B mode.';
+  else if(routeMode==='base'&&!B) g.innerHTML='<b>Base → B:</b> The route starts at the base camp. Click the map or press Set B to pick the destination.';
+  else if(!A) g.innerHTML='<b>Start:</b> Point at a location on the map; press Set A or the A key.';
   else if(!B) g.innerHTML='<b>Destination:</b> Point at a new location; press Set B or the B key.';
   else if(!terrainReady) g.innerHTML='<b>Loading terrain.</b> Waiting for real pathing terrain data…';
   else if(routeLoading) g.innerHTML='<b>Calculating route.</b> Preparing AI route summary…';
@@ -641,8 +701,8 @@ function renderGuide(){
   else if(example) g.innerHTML='<b>Example route.</b> Click two points on the map for your own route.';
   else if(safe) g.innerHTML='<b>Route ready.</b> AI route summary and navigation advice are ready.';
   else g.innerHTML='<b>No route found.</b> Change the settings and try again.';
-  $('swap').disabled=!(A&&B); $('clear').disabled=!A; $('cRoute').disabled=!safe;
-  $('setA').disabled=!selectionPoint; $('setB').disabled=!selectionPoint;
+  $('swap').disabled=!(A&&B)||routeMode==='base'; $('clear').disabled=routeMode==='base'?!B:!A; $('cRoute').disabled=!safe;
+  $('setA').disabled=!selectionPoint||routeMode==='base'; $('setB').disabled=!selectionPoint;
   $('calculate').disabled=!(A&&B)||routeLoading||!terrainReady;
   $('calculate').textContent=routeLoading?'Calculating…':routeDirty?'Calculate':'Recalculate';
 }
@@ -670,7 +730,7 @@ async function requestRoute(){
   try{
     const response=await fetch('/route',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({start:A,end:B})
+      body:JSON.stringify(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B})
     });
     const data=await response.json();
     if(!response.ok) throw new Error(data.error||'Route request failed.');
@@ -686,6 +746,14 @@ async function requestRoute(){
   }finally{
     if(requestId===routeRequestId){ routeLoading=false; updateAll(); }
   }
+}
+async function loadBase(){
+  try{
+    const response=await fetch('/base');
+    BASE=await response.json();
+    if(!response.ok) BASE={available:false};
+  }catch(error){ BASE={available:false}; }
+  if(routeMode==='base'&&BASE.available) A={...BASE.point};
 }
 async function loadRealTerrain(){
   terrainReady=false; updateAll();
@@ -709,6 +777,7 @@ async function loadRealTerrain(){
     T.dataSource=data.source;
     terrainReady=true;
     renderTerrainTexture(); buildTerrainMesh(); drawOverlay();
+    await loadBase();
     invalidateRoute();
   }catch(error){
     routeError=error.message||'Could not load real terrain data.';
@@ -744,6 +813,7 @@ function nearMarker(point){
 function updateHover(hit,event){
   const point=hit?hitToPoint(hit):null;
   hoverPoint=point;
+  canvas.style.cursor=baseScreenDistance(event)<22?'pointer':'';
   if(point) selectionPoint={x:point.x,y:point.y};
   if(point){const geo=pointToGeo(point);hoverMesh.position.copy(geoVector(geo.lon,geo.lat,1.0008));hoverMesh.visible=true;}
   else hoverMesh.visible=false;
@@ -760,6 +830,7 @@ canvas.addEventListener('pointerdown',event=>{
   const hit=hitTerrain(event),point=hit&&hitToPoint(hit);
   press={x:event.clientX,y:event.clientY,moved:false,point};
   drag=point?nearMarker(point):null;
+  if(drag==='A'&&routeMode==='base') drag=null;
   if(drag) controls.enabled=false;
   tip.style.display='none';
 });
@@ -778,13 +849,16 @@ function endGlobePointer(event){
   press=null;drag=null;controls.enabled=true;
   if(dragged){if(moved)invalidateRoute();return;}
   if(moved||event.type==='pointercancel')return;
+  if(baseScreenDistance(event)<22){ showBasePopup(); return; }
   const point=selectedPoint;
   if(!point)return;
-  if(!A||B){setRoutePoint('A',point);}
+  if(routeMode==='base') setRoutePoint('B',point);
+  else if(!A||B){setRoutePoint('A',point);}
   else setRoutePoint('B',point);
 }
 function setRoutePoint(label,point){
   if(!point)return;
+  if(routeMode==='base') label='B';
   const selected={x:point.x,y:point.y};
   if(label==='A'){
     A=selected;
@@ -820,7 +894,17 @@ document.querySelectorAll('#range button').forEach(button=>button.addEventListen
 $('swap').addEventListener('click',()=>{ if(A&&B){ [A,B]=[B,A]; invalidateRoute(); } });
 $('setA').addEventListener('click',()=>setRoutePoint('A',selectionPoint));
 $('setB').addEventListener('click',()=>setRoutePoint('B',selectionPoint));
-$('clear').addEventListener('click',()=>{ A=B=null; example=false; invalidateRoute(); });
+$('clear').addEventListener('click',()=>{ B=null; if(routeMode==='ab') A=null; example=false; invalidateRoute(); });
+document.querySelectorAll('#mode button').forEach(button=>button.addEventListener('click',()=>{
+  if(button.dataset.mode===routeMode) return;
+  document.querySelectorAll('#mode button').forEach(item=>item.classList.toggle('on',item===button));
+  routeMode=button.dataset.mode;
+  A=routeMode==='base'&&BASE?.available?{...BASE.point}:null;
+  if(A&&B&&A.x===B.x&&A.y===B.y) B=null;
+  example=false; invalidateRoute();
+}));
+$('popupClose').addEventListener('click',hidePopup);
+document.addEventListener('keydown',event=>{ if(event.key==='Escape') hidePopup(); });
 $('calculate').addEventListener('click',()=>{
   if(!(A&&B)||routeLoading) return;
   requestRoute();

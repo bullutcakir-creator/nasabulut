@@ -2,6 +2,7 @@ const express = require('express');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { weatherFor, waypointImagesFor, trekLayers } = require('./weather');
+const { computeBase } = require('./planning');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -9,6 +10,15 @@ const aiBackendUrl = process.env.AI_BACKEND_URL || 'http://localhost:5001';
 const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS) > 0 ? Number(process.env.AI_TIMEOUT_MS) : 300000;
 const pathingModulePromise = import(pathToFileURL(path.join(__dirname, 'pathing/src/server/routing.js')).href);
 const pathingTerrainPromise = pathingModulePromise.then(({ Terrain }) => Terrain.load(path.join(__dirname, 'pathing/src/build')));
+// Base camp at the map centre, computed once from the terrain grid.
+const basePromise = pathingTerrainPromise.then(terrain => {
+    const base = computeBase(terrain);
+    if (base.available) base.point = lonLatToFrontendPoint([base.lon, base.lat], terrain);
+    console.log(base.available
+        ? `Base camp: lat ${base.lat.toFixed(5)}, lon ${base.lon.toFixed(5)} (cell ${base.row},${base.col})${base.adjusted ? `, moved ${base.adjustment_m} m from the map centre` : ', exact map centre'}`
+        : `Base camp unavailable: ${base.note}`);
+    return base;
+});
 const systemPrompt = 'You are a helpful assistant. Respond clearly and accurately.';
 const navigationSystemPrompt = [
     'You are a practical Mars rover route analyst. Write all user-facing text in English.',
@@ -623,7 +633,11 @@ app.post('/ai', async (req, res) => {
 });
 
 app.post('/route', async (req, res) => {
-    const { start, end } = req.body;
+    const { end } = req.body;
+    const startBase = req.body.startBase === true;
+    const base = startBase ? await basePromise.catch(() => null) : null;
+    if (startBase && !base?.available) return res.status(503).json({ error: 'Base camp is unavailable' });
+    const start = startBase ? base.point : req.body.start;
     const hour = Number.isFinite(Number(req.body.hour)) ? Number(req.body.hour) : 13;
     const ls = Number.isFinite(Number(req.body.ls)) && req.body.ls !== null && req.body.ls !== '' ? Number(req.body.ls) : null;
     const validPoint = point => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
@@ -636,7 +650,7 @@ app.post('/route', async (req, res) => {
         const { SLOPE_LIMIT_DEG } = await pathingModulePromise;
         const pathingTerrain = await pathingTerrainPromise;
         const pathingResult = pathingTerrain.compute(
-            frontendPointToLonLat(start, pathingTerrain),
+            startBase ? { lon: base.lon, lat: base.lat } : frontendPointToLonLat(start, pathingTerrain),
             frontendPointToLonLat(end, pathingTerrain)
         );
         if (pathingResult.status !== 'ok' && pathingResult.status !== 'fallback') {
@@ -687,6 +701,7 @@ app.post('/route', async (req, res) => {
             traversalCost: balanced.cost_breakdown.balanced_cost,
             slopeLimit: SLOPE_LIMIT_DEG,
             startAdjusted: route[0].x !== start.x || route[0].y !== start.y,
+            startIsBase: startBase,
             endAdjusted: route[route.length - 1].x !== end.x || route[route.length - 1].y !== end.y,
             engine: 'pathing/src/server/routing.js',
             depression_avoidance: 'multi-scale DEM depression penalty discourages crater-like basins; extreme slopes remain impassable',
@@ -770,6 +785,14 @@ app.get('/weather', (req, res) => {
 });
 app.get('/waypoint-images', (req, res) => {
     res.json(waypointImagesFor(req.query.site, req.query.drive));
+});
+app.get('/base', async (req, res) => {
+    try {
+        const base = await basePromise;
+        return res.status(base.available ? 200 : 503).json(base);
+    } catch (error) {
+        return res.status(500).json({ error: 'Unable to compute base camp', details: error.message });
+    }
 });
 app.get('/trek-layers', (req, res) => {
     res.json(trekLayers || { status: 'not_ready', layers: [] });
