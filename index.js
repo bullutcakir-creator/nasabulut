@@ -211,25 +211,52 @@ function checkedNarration(narration, facts) {
     return { narration: out, source: problems.length ? 'model_filtered' : 'model', problems };
 }
 
-// --- English-only guard: if a model answer contains Turkish letters, ask once more; if it is still not English,
-// fall back to the English template narration (narrationSource "template").
+// --- English-only guard -------------------------------------------------------------------------------
+// Model answers must enter the system in English. If an answer looks Turkish, the model is asked once to
+// translate its own answer into English (keys, structure and numbers unchanged); the translation is checked
+// again, and if it is still not English the English template narration is used (narrationSource "template").
 // Turkish letters (c-cedilla, g-breve, dotless i, s-cedilla, o/u-umlaut and capitals), written as escapes so the source stays ASCII here.
-const NON_ENGLISH = /[\u00e7\u011f\u0131\u015f\u00f6\u00fc\u00c7\u011e\u0130\u015e\u00d6\u00dc]/;
+const TURKISH_LETTERS = /[\u00e7\u011f\u0131\u015f\u00f6\u00fc\u00c7\u011e\u0130\u015e\u00d6\u00dc]/;
+// Common Turkish words, also in their ASCII spellings, to catch Turkish typed without special letters.
+const TURKISH_WORDS = new Set(['ve', 'bir', 'bu', 'daha', 'ile', 'olarak', 'icin', 'gibi', 'ancak', 'fakat', 'rotasi', 'rotanin',
+    'egim', 'egimi', 'yuksek', 'dusuk', 'mesafe', 'mesafesi', 'arazi', 'guvenli', 'boyunca', 'kadar', 'sonra', 'olan', 'degil',
+    'cok', 'yolu', 'yonunde', 'dikkat', 'ortalama', 'tirmanis', 'inis', 'sicaklik', 'ruzgar', 'basinc', 'toz', 'gunes']);
+function looksNonEnglish(text) {
+    const s = String(text || '');
+    if (TURKISH_LETTERS.test(s)) return true;
+    const words = new Set(s.toLowerCase().match(/[a-z]+/g) || []);
+    let hits = 0;
+    for (const w of words) if (TURKISH_WORDS.has(w) && ++hits >= 2) return true;
+    return false;
+}
 function assistantText(responseData) {
     return String(responseData?.choices?.[0]?.message?.content ?? responseData?.content ?? '');
 }
+const translatePrompt = [
+    'You are a translator. Translate every string value of the JSON object you receive into clear English.',
+    'Keep exactly the same keys, structure and order. Keep every number and unit exactly as written. Do not add or remove information.',
+    ENGLISH_RULE,
+    'Output only the translated JSON object, with no markdown or other text.'
+].join(' ');
 async function englishNarration(messages, facts) {
     const problems = [];
-    for (let attempt = 1; attempt <= 2; attempt++) {
-        const aiResponse = await requestAi(messages, navigationSystemPrompt, true, 1800);
-        let parsed = null;
-        try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
-        const checked = checkedNarration(parsed, facts);
-        if (!NON_ENGLISH.test(assistantText(aiResponse)) && !NON_ENGLISH.test(JSON.stringify(checked.narration))) {
-            return { ...checked, problems: [...problems, ...checked.problems], attempts: attempt };
-        }
-        problems.push(`attempt ${attempt}: answer contained non-English characters`);
+    const first = await requestAi(messages, navigationSystemPrompt, true, 1800);
+    let parsed = null;
+    try { parsed = parseAssistantJson(first); } catch { parsed = null; }
+    let checked = checkedNarration(parsed, facts);
+    if (!looksNonEnglish(assistantText(first)) && !looksNonEnglish(JSON.stringify(checked.narration))) {
+        return { ...checked, attempts: 1 };
     }
+    problems.push('attempt 1: answer was not in English; asked the model to translate it');
+    // second request: translate the model's own answer (or the raw text if it was not valid JSON)
+    const translated = await requestAi([{ role: 'user', content: parsed ? JSON.stringify(parsed) : assistantText(first) }], translatePrompt, true, 1800);
+    let parsed2 = null;
+    try { parsed2 = parseAssistantJson(translated); } catch { parsed2 = null; }
+    checked = checkedNarration(parsed2, facts);
+    if (checked.source !== 'template' && !looksNonEnglish(assistantText(translated)) && !looksNonEnglish(JSON.stringify(checked.narration))) {
+        return { ...checked, source: checked.source === 'model' ? 'model_translated' : `${checked.source}_translated`, problems: [...problems, ...checked.problems], attempts: 2 };
+    }
+    problems.push('attempt 2: translation was still not English; using the English template');
     return { narration: templateNarration(facts), source: 'template', problems, attempts: 2 };
 }
 
@@ -659,7 +686,12 @@ app.post('/ai', async (req, res) => {
 
     try {
         let answer = await requestAi([{ role: 'user', content }]);
-        if (NON_ENGLISH.test(assistantText(answer))) answer = await requestAi([{ role: 'user', content }]);
+        if (looksNonEnglish(assistantText(answer))) {
+            // ask the model to translate its own answer into English
+            const text = assistantText(answer);
+            answer = await requestAi([{ role: 'user', content: `Translate this answer into English. Keep numbers and units exactly.\n\n${text}` }]);
+            if (looksNonEnglish(assistantText(answer))) answer = { ...answer, language_warning: 'The model did not answer in English.' };
+        }
         return res.json(answer);
     } catch (error) {
         return sendAiError(res, error);
