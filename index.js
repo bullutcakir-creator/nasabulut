@@ -192,19 +192,19 @@ function checkedNarration(narration, facts) {
 }
 
 function fallbackNavigationStep(waypoint) {
-    const directions = { east: 'doğuya', west: 'batıya', south: 'güneye', north: 'kuzeye' };
+    const directions = { east: 'east', west: 'west', south: 'south', north: 'north' };
     const direction = directions[waypoint.legDirection];
     const legMoves = waypoint.legGridMoves;
     return {
         instruction: direction
-            ? `${direction} ilerleyerek (${waypoint.x}, ${waypoint.y}) waypointine ulaş.`
-            : `Başlangıç waypointi (${waypoint.x}, ${waypoint.y}) konumunu doğrula.`,
+            ? `Head ${direction} to waypoint (${waypoint.x}, ${waypoint.y}).`
+            : `Confirm the start waypoint at (${waypoint.x}, ${waypoint.y}).`,
         commentary: direction
-            ? `Bu bacak ${direction} yönünde ${legMoves} ızgara hareketi sürer ve hesaplanan düşük maliyetli rover rotasını izler.`
-            : 'Bu, hesaplanan düşük maliyetli rover rotasının başlangıç noktasıdır.',
+            ? `This leg runs ${direction} for ${legMoves} grid moves and follows the computed low-cost rover route.`
+            : 'This is the start of the computed low-cost rover route.',
         tip: legMoves > 10
-            ? 'Uzun düz bacakta yönünü düzenli doğrula; sonraki dönüş waypointine yaklaşırken yavaşla.'
-            : 'Waypoint koordinatını doğrula ve yön değişiminde kontrollü ilerle.',
+            ? 'On this long straight leg, check heading regularly and slow down near the next turn.'
+            : 'Confirm the waypoint coordinate and move carefully through the turn.',
         x: waypoint.x,
         y: waypoint.y
     };
