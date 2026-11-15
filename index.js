@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { weatherFor, waypointImagesFor, trekLayers } = require('./weather');
-const { computeBase } = require('./planning');
+const { computeBase, computeTravel, farthestFromBase } = require('./planning');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -28,6 +28,7 @@ const navigationSystemPrompt = [
     'Explain that weighted Dijkstra minimizes the fixed balanced rover cost on this sampled grid, with a one-cell safety buffer around extreme or unknown terrain; it does not guarantee the shortest physical distance, best weather, or real-world safety. Compare the route factors clearly and mention endpoint adjustments when provided.',
     'If risk.shortestAlternative is present, compare its measured distance, balanced traversal cost, depression penalty, and adjacent blocked-cell contacts with the chosen route. Describe only differences supported by those values; do not assume the alternative is riskier. If it is absent, say the shortest and balanced objectives produced the same route.',
     'environment.weather holds measured medians for the selected local hour at Jezero (Perseverance MEDA temperature, pressure, wind and humidity; Mastcam-Z dust optical depth; Mars24 sun elevation; Curiosity RAD radiation from Gale crater). Describe them as typical measured conditions, not a forecast. Use only these supplied values; if a value is null, say it is unavailable. Soil strength is unavailable. Never invent weather conditions. Weather did not change the route geometry.',
+    'travel holds precomputed rover-plus-walking times, arrival time, EVA-window and walk-back checks, and the EVA radiation dose; quote these values as given and do not recompute them. Travel time is information only and did not change the route.',
     'Include a concise navigation summary describing the broad sequence of route directions and practical rover-following tips, without repeating every coordinate.',
     'Return exactly one syntactically valid JSON object with this schema: {"why":"specific English explanation","factors":[{"name":"Slope","value":"verified value or comparison","effect":"why it matters"}],"environment":{"slope":"...","elevation":"...","surface":"...","weather":"short summary using only the supplied weather values"},"navigation":"concise English overview and practical tips"}.',
     'Every object property must have a colon between its name and value. Separate properties and array items with commas. Quote all property names and string values with double quotes. Do not use comments, trailing commas, or unquoted text.',
@@ -92,7 +93,8 @@ function parseAssistantJson(responseData) {
 // conversion, so rounding like "about 36 km" is fine. Facts = JSON sent to the model WITHOUT route coordinates.
 // If a sentence contains an unsupported unit number, ONLY that sentence is removed; the rest of the model text stays.
 // The whole narration is replaced by the template only if its structure is invalid or "why" becomes empty.
-const UNIT_NUMBER = /(-?\d[\d.,]*\d|-?\d)\s*(°\s?C|°|K\b|km\b|m\/s|m\b|Pa\b|%|mSv|mGy)/g;
+// Speeds (km/h, m/min) are not distances, so they are excluded from the unit check.
+const UNIT_NUMBER = /(-?\d[\d.,]*\d|-?\d)\s*(°\s?C|°|K\b|km\b(?!\/h)|m\/s|m\b(?!\/min)|Pa\b|%|mSv|mGy)/g;
 // Which fact keys a unit may be compared with (unit-aware, so "27.3°" is only checked against angles).
 const UNIT_KEYS = [
     [/^°\s?C$/, /_c$|temp/],
@@ -677,6 +679,13 @@ app.post('/route', async (req, res) => {
             weather: weatherFor({ hour, ls }),
             soil_strength: 'unavailable; not used in routing'
         };
+        const baseCamp = base || await basePromise.catch(() => null);
+        const travel = computeTravel({
+            route_length_m: balanced.surface_distance_m,
+            farthest_from_base_m: farthestFromBase(balanced.geometry.coordinates, baseCamp, pathingTerrain),
+            radiation_msv_per_day: environment.weather?.radiation_msv_per_day ?? null,
+            settings: req.body.travel || {}
+        });
         const profile = routeProfile(balanced.geometry.coordinates, pathingTerrain);
         const shortest = pathingResult.routes.find(route => route.objective === 'shortest');
         const risk = {
@@ -715,6 +724,7 @@ app.post('/route', async (req, res) => {
             profile,
             risk,
             optimality,
+            travel,
             status: pathingResult.status,
             fallback: pathingResult.status === 'fallback',
             routeWarning: pathingResult.status === 'fallback' ? pathingResult.reason?.message : null,
@@ -725,14 +735,14 @@ app.post('/route', async (req, res) => {
                 role: 'user',
                 content: JSON.stringify({
                     task: 'Explain why this computed rover route is preferred using a single evidence-based overview.',
-                    route, optimality, environment, risk,
+                    route, optimality, environment, risk, travel,
                     status: pathingResult.status,
                     fallback: pathingResult.status === 'fallback',
                     routeWarning: response.routeWarning,
                     validation: balanced.validation
                 })
             }], navigationSystemPrompt, true, 1800);
-            const facts = { optimality, environment, risk, status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
+            const facts = { optimality, environment, risk, travel, status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
             let parsed = null;
             try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
             const checked = checkedNarration(parsed, facts);
@@ -785,6 +795,18 @@ app.get('/weather', (req, res) => {
 });
 app.get('/waypoint-images', (req, res) => {
     res.json(waypointImagesFor(req.query.site, req.query.drive));
+});
+app.post('/travel', async (req, res) => {
+    const length = Number(req.body?.route_length_m);
+    if (!Number.isFinite(length) || length < 0) return res.status(400).json({ error: 'route_length_m must be a non-negative number' });
+    const farthest = Number(req.body?.farthest_from_base_m);
+    const radiation = weatherFor({ hour: 13 }).radiation_msv_per_day ?? null;
+    return res.json(computeTravel({
+        route_length_m: length,
+        farthest_from_base_m: Number.isFinite(farthest) ? farthest : null,
+        radiation_msv_per_day: radiation,
+        settings: req.body?.settings || {}
+    }));
 });
 app.get('/base', async (req, res) => {
     try {
