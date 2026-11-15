@@ -23,9 +23,11 @@ async function resolveBase(input) {
     if (base.available) base.point = lonLatToFrontendPoint([base.lon, base.lat], terrain);
     return base;
 }
-const systemPrompt = 'You are a helpful assistant. Respond clearly and accurately.';
+const ENGLISH_RULE = 'Always answer in English, even if any input text is in another language.';
+const systemPrompt = `You are a helpful assistant. Respond clearly and accurately. ${ENGLISH_RULE}`;
 const navigationSystemPrompt = [
     'You are a practical Mars rover route analyst. Write all user-facing text in English.',
+    ENGLISH_RULE,
     'The route has already been calculated by weighted Dijkstra search. Do not modify the path or invent coordinates.',
     'If the route is marked as a least-risk fallback, state plainly that no fully passable route exists and that this alternative still crosses hazards. Explain the measured fallback risk; never call it safe or passable.',
     'Return one overview, not one explanation per waypoint. Explain why this route is preferred using only the supplied verified metrics: traversal cost, distance, surface distance, mean and maximum slope, ascent, descent, elevation, passability, depression/crater avoidance cost, nearby alternative tradeoff, and data source coverage.',
@@ -34,10 +36,11 @@ const navigationSystemPrompt = [
     'environment.weather holds measured medians for the selected local hour at Jezero (Perseverance MEDA temperature, pressure, wind and humidity; Mastcam-Z dust optical depth; Mars24 sun elevation; Curiosity RAD radiation from Gale crater). Describe them as typical measured conditions, not a forecast. Use only these supplied values; if a value is null, say it is unavailable. Soil strength is unavailable. Never invent weather conditions. Weather did not change the route geometry.',
     'travel holds precomputed rover-plus-walking times, arrival time, EVA-window and walk-back checks, and the EVA radiation dose; quote these values as given and do not recompute them. Travel time is information only and did not change the route.',
     'restZones lists flat, low-hazard ~1 km tiles within 2 km of the route, in order along it, with their distance to the route, score, slope and sunlight at the selected hour; you may add one short "rest stops" sentence using only these values and the longest stretch without a rest zone. Temperature and radiation are site-wide single values, not per zone.',
+    'mission holds the site-wide environment for the selected hour and season (temperature, pressure, wind, humidity, dust, UV, sun, radiation) with percentiles, and perseverance gives the nearest Perseverance waypoint to the route. These are single-site values, not per-location; you may cite them, but they did not change the route.',
     'Include a concise navigation summary describing the broad sequence of route directions and practical rover-following tips, without repeating every coordinate.',
-    'Return exactly one syntactically valid JSON object with this schema: {"why":"specific English explanation","factors":[{"name":"Slope","value":"verified value or comparison","effect":"why it matters"}],"environment":{"slope":"...","elevation":"...","surface":"...","weather":"short summary using only the supplied weather values"},"navigation":"concise English overview and practical tips"}.',
+    'Return exactly one syntactically valid JSON object with this schema: {"why":"specific English explanation","factors":[{"name":"Slope","value":"verified value or comparison","effect":"why it matters"},{"name":"Elevation","value":"...","effect":"..."},{"name":"Distance","value":"...","effect":"..."}],"environment":{"slope":"...","elevation":"...","surface":"...","weather":"short summary using only the supplied weather values"},"navigation":"concise English overview and practical tips"}.',
     'Every object property must have a colon between its name and value. Separate properties and array items with commas. Quote all property names and string values with double quotes. Do not use comments, trailing commas, or unquoted text.',
-    'The required structure is illustrated by this valid example (numbers are illustrative only; use the supplied values): {"why":"This route balances slope and climb under the fixed rover cost. It does not guarantee the shortest distance; typical measured conditions are listed below.","factors":[{"name":"Slope","value":"mean 8.2°, max 18.4°","effect":"Lower slope reduces climbing effort and slip risk."}],"environment":{"slope":"mean 8.2°","elevation":"ascent 42 m","surface":"horizontal 1200 m, surface 1210 m","weather":"air -40.0 °C, wind median 4.1 m/s"},"navigation":"Follow the route in order; confirm heading on long straight legs and slow down at turns."}.',
+    'The required structure is illustrated by this valid example (numbers are illustrative only; use the supplied values): {"why":"This route balances slope and climb under the fixed rover cost. It does not guarantee the shortest distance; typical measured conditions are listed below.","factors":[{"name":"Slope","value":"mean 8.2°, max 18.4°","effect":"Lower slope reduces climbing effort and slip risk."},{"name":"Elevation","value":"ascent 42 m, descent 30 m","effect":"Less climbing saves energy."},{"name":"Distance","value":"1.2 km","effect":"Shorter drives take less time."}],"environment":{"slope":"mean 8.2°","elevation":"ascent 42 m","surface":"horizontal 1200 m, surface 1210 m","weather":"air -40.0 °C, wind median 4.1 m/s"},"navigation":"Follow the route in order; confirm heading on long straight legs and slow down at turns."}.',
     'Use only numbers that appear in the supplied JSON (you may convert metres to kilometres). Use a dot as the decimal separator.',
     'Output only the JSON object. Do not include markdown, code fences, greetings, analysis, or text outside it.'
 ].join(' ');
@@ -206,6 +209,28 @@ function checkedNarration(narration, facts) {
     };
     if (!out.why) return { narration: templateNarration(facts), source: 'template', problems: [...problems, 'why empty after filtering'] };
     return { narration: out, source: problems.length ? 'model_filtered' : 'model', problems };
+}
+
+// --- English-only guard: if a model answer contains Turkish letters, ask once more; if it is still not English,
+// fall back to the English template narration (narrationSource "template").
+// Turkish letters (c-cedilla, g-breve, dotless i, s-cedilla, o/u-umlaut and capitals), written as escapes so the source stays ASCII here.
+const NON_ENGLISH = /[\u00e7\u011f\u0131\u015f\u00f6\u00fc\u00c7\u011e\u0130\u015e\u00d6\u00dc]/;
+function assistantText(responseData) {
+    return String(responseData?.choices?.[0]?.message?.content ?? responseData?.content ?? '');
+}
+async function englishNarration(messages, facts) {
+    const problems = [];
+    for (let attempt = 1; attempt <= 2; attempt++) {
+        const aiResponse = await requestAi(messages, navigationSystemPrompt, true, 1800);
+        let parsed = null;
+        try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
+        const checked = checkedNarration(parsed, facts);
+        if (!NON_ENGLISH.test(assistantText(aiResponse)) && !NON_ENGLISH.test(JSON.stringify(checked.narration))) {
+            return { ...checked, problems: [...problems, ...checked.problems], attempts: attempt };
+        }
+        problems.push(`attempt ${attempt}: answer contained non-English characters`);
+    }
+    return { narration: templateNarration(facts), source: 'template', problems, attempts: 2 };
 }
 
 function fallbackNavigationStep(waypoint) {
@@ -633,7 +658,9 @@ app.post('/ai', async (req, res) => {
         : prompt.trim();
 
     try {
-        return res.json(await requestAi([{ role: 'user', content }]));
+        let answer = await requestAi([{ role: 'user', content }]);
+        if (NON_ENGLISH.test(assistantText(answer))) answer = await requestAi([{ role: 'user', content }]);
+        return res.json(answer);
     } catch (error) {
         return sendAiError(res, error);
     }
@@ -771,24 +798,21 @@ app.post('/route', async (req, res) => {
             validation: balanced.validation
         };
         try {
-            const aiResponse = await requestAi([{
+            const { sources, ...mission } = missionData({ hour, ls });
+            const perseveranceForAi = perseverance.available ? { sol: perseverance.sol, site: perseverance.site, drive: perseverance.drive, distance_m: perseverance.distance_m } : null;
+            const facts = { optimality, environment, risk, travel, restZones: restZonesForAi(restZones), mission, perseverance: perseveranceForAi,
+                status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
+            const checked = await englishNarration([{
                 role: 'user',
                 content: JSON.stringify({
                     task: 'Explain why this computed rover route is preferred using a single evidence-based overview.',
-                    route, optimality, environment, risk, travel, restZones: restZonesForAi(restZones),
-                    status: pathingResult.status,
-                    fallback: pathingResult.status === 'fallback',
-                    routeWarning: response.routeWarning,
-                    validation: balanced.validation
+                    route, ...facts, routeWarning: response.routeWarning
                 })
-            }], navigationSystemPrompt, true, 1800);
-            const facts = { optimality, environment, risk, travel, restZones: restZonesForAi(restZones), status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
-            let parsed = null;
-            try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
-            const checked = checkedNarration(parsed, facts);
+            }], facts);
             response.narration = checked.narration;
             response.narrationSource = checked.source;
             response.narrationCheck = checked.problems;
+            response.narrationAttempts = checked.attempts;
         } catch (error) {
             response.narrationError = error.message || 'AI narration unavailable';
         }
@@ -810,19 +834,15 @@ app.post('/ai/narrate', async (req, res) => {
     }
 
     try {
-        const aiResponse = await requestAi([{
+        const facts = { optimality, environment, risk: risk || null };
+        const checked = await englishNarration([{
             role: 'user',
             content: JSON.stringify({
                 task: 'Explain why this computed rover route is preferred using a single evidence-based overview.',
-                optimality,
-                environment,
-                risk: risk || null,
+                ...facts,
                 route
             })
-        }], navigationSystemPrompt, true, 1800);
-        let parsed = null;
-        try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
-        const checked = checkedNarration(parsed, { optimality, environment, risk: risk || null });
+        }], facts);
         return res.json({ ...checked.narration, source: checked.source, check: checked.problems });
     } catch (error) {
         return sendAiError(res, error);

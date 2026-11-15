@@ -821,7 +821,7 @@ function drawOverlay(){
 
 loadGlobeTexture(); setCamera(1.026); resizeGlobe(); animateGlobe();
 
-/* ---------- grafikler ---------- */
+/* ---------- charts ---------- */
 function drawChart(cv,series,o){
   const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=200;
   cv.width=w*dpr; cv.height=h*dpr; const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
@@ -867,7 +867,7 @@ function chartHover(e){
 function chartLeave(){ hoverX=null; hoverPoint=null; hoverMesh.visible=false; $('readout').textContent=''; drawCharts(); }
 ['chElev','chSlope'].forEach(id=>{ $(id).addEventListener('pointermove',chartHover); $(id).addEventListener('pointerleave',chartLeave); });
 
-/* ---------- rota özeti ---------- */
+/* ---------- route summary ---------- */
 function renderStats(){
   const stats=$('stats');
   if(!safe){
@@ -886,7 +886,7 @@ function renderStats(){
   ].map(([label,value])=>`<div>${label}</div><div class="v">${value}</div>`).join('');
 }
 function weatherRows(w){
-  // NASA olcum verisi (MEDA, Mastcam-Z, Mars24): secilen yerel saatin ortanca degerleri, tahmin degil
+  // NASA measurements (MEDA, Mastcam-Z, Mars24): medians for the selected local hour, not a forecast
   if(!w||!w.available) return [['Weather','no data']];
   const v=(x,u)=>Number.isFinite(x)?f1(x)+u:'—';
   const rows=[[`Weather (${String(w.hour_ltst).padStart(2,'0')}:00 local)`,w.in_eva_window?'Inside EVA window':'Outside EVA window'],
@@ -1173,7 +1173,7 @@ async function loadRealTerrain(){
     updateAll();
   }
 }
-/* ---------- etkileşim ---------- */
+/* ---------- interaction ---------- */
 const tip=$('tip'), mb=$('mapbox');
 canvas.addEventListener('pointerenter',()=>canvas.focus({preventScroll:true}));
 function hitTerrain(event){
@@ -1340,7 +1340,7 @@ $('themeToggle').addEventListener('click',()=>{
 });
 $('themeToggle').textContent=document.documentElement.dataset.theme==='light'?'Dark':'Light';
 
-/* ---------- durma mesafesi hesaplayıcı ---------- */
+/* ---------- stopping distance calculator ---------- */
 const BODIES=[['Mars',3.72,'#ff7a3d'],['Earth',9.81,'#6fe3ff'],['Moon',1.62,'#a89f95']];
 const fD=d=>d<1?f1(d*100)+' cm':(d<1000?f1(d)+' m':(d/1000).toLocaleString('en-US',{maximumFractionDigits:2})+' km');
 function calc(){
