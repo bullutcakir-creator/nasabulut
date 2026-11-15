@@ -1,9 +1,10 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mars Gezgini: Jezero Rota Haritası</title>
+<title>Mars Rover: Jezero Route Map</title>
+<script>try{if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light';}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -12,11 +13,21 @@
   --text:#ededed; --muted:#b8b8b8; --dim:#888;
   --accent:#e5a84b; --safe:#69d7e8; --short:#ffd27a; --danger:#ff5a5a; --ok:#7dff9b; --rock:#b9a2ff; --sand:#f0d070;
   --mono:'JetBrains Mono',ui-monospace,monospace; --sans:'Space Grotesk',system-ui,sans-serif;
+  --card-text:#e2d2c5; --tip-bg:rgba(13,9,7,.94); --chart-axis:#806e62; --chart-grid:#35261d; --chart-line:#6fe3ff; --chart-hover:rgba(255,255,255,.6);
+  color-scheme:dark;
+}
+[data-theme="light"]{
+  --bg:#f3f1ed; --bg2:#e9e5df; --panel:#ffffff; --panel2:#f1eee9; --line:#d3ccc2;
+  --text:#1c1b1a; --muted:#4f4b46; --dim:#6f6a63;
+  --accent:#a3620c; --safe:#0a7489; --short:#7d5a00; --danger:#c42b2b; --ok:#1c7a37; --rock:#6a4fc7; --sand:#8a6d00;
+  --card-text:#2b2724; --tip-bg:rgba(255,255,255,.96); --chart-axis:#6f6a63; --chart-grid:#e1dbd2; --chart-line:#0a7489; --chart-hover:rgba(0,0,0,.45);
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.55}
 .wrap{max-width:1260px;margin:0 auto;padding:0 20px}
 header.hero{padding:12px 0;border-bottom:1px solid var(--line);background:var(--bg)}
+header.hero .wrap{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .kicker{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 h1{font-size:30px;line-height:1.1;margin:7px 0 5px}
 h1 span{color:var(--safe)}
@@ -45,7 +56,16 @@ section{padding:34px 0;border-top:1px solid var(--line)}
 #scale .bar{height:5px;border:1px solid #fff;border-top:0;margin-top:3px;box-shadow:0 1px 2px #000}
 #guide{margin:0 0 7px;background:transparent;border-left:2px solid var(--accent);padding:5px 9px;font-size:13px;line-height:1.35}
 #guide b{color:var(--accent)}
-#tip{position:absolute;pointer-events:none;background:rgba(13,9,7,.94);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:12px/1.45 var(--mono);display:none;white-space:nowrap;z-index:3}
+#tip{position:absolute;pointer-events:none;background:var(--tip-bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:12px/1.45 var(--mono);display:none;white-space:nowrap;z-index:3}
+#popup{position:absolute;top:10px;right:10px;width:min(300px,calc(100% - 20px));max-height:calc(100% - 20px);overflow:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:10px 12px;font-size:12.5px;z-index:4;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+#popup[hidden]{display:none}
+#popup h4{margin:0 26px 6px 0;font-size:14px}
+#popup .close{position:absolute;top:6px;right:6px;width:24px;height:24px;padding:0;line-height:20px}
+#popup .kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 10px}
+#popup .kv div{padding:3px 0;border-bottom:1px solid var(--line)}
+#popup .kv .v{font-family:var(--mono);text-align:right}
+#popup .tag{margin-top:8px;font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em}
+#popup .muted{color:var(--muted);margin-top:6px}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:10px 4px 2px;font-size:12.5px;color:var(--muted)}
 .legend .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .legend .grad{display:inline-block;width:110px;height:9px;border-radius:3px;vertical-align:middle;margin:0 6px}
@@ -64,10 +84,57 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .stats div{padding:6px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
 .stats .h{font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em;text-align:right}
 .stats .v{font-family:var(--mono);text-align:right;font-size:12px}
-.stats .c1{color:var(--safe)} .stats .c2{color:var(--short)} .stats .c3{color:#d8c7ba}
+.stats .c1{color:var(--safe)} .stats .c2{color:var(--short)} .stats .c3{color:var(--card-text)}
 .stats .bad{color:var(--danger)} .stats .good{color:var(--ok)}
+/* Route summary rows: 2 px smaller than the other stat boxes */
+#stats{font-size:10.5px} #stats .v{font-size:10px}
 .note{font-size:13px;color:var(--muted)}
-.warnbox{display:none;margin-top:10px;padding:10px;border-radius:9px;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.4);font-size:13px}
+.tgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin:4px 0 10px}
+.tgrid label{display:block;font-size:12px;color:var(--muted)}
+.tgrid input{width:100%;margin-top:2px;background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:5px 7px;font:12.5px var(--mono)}
+.tgrid input:focus{outline:1px solid var(--accent)}
+.tgrid .tlabel{display:block;font-size:12px;color:var(--muted)}
+.tgrid .tval{display:block;margin-top:2px;padding:5px 0;font:600 13px var(--mono);color:var(--text)}
+.tgrid small{display:block;font-size:10.5px;line-height:1.3;color:var(--dim);margin-top:2px}
+.zonebar{margin:0 4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg2);font-size:12.5px;color:var(--muted)}
+.zonebar summary{cursor:pointer;padding:6px 10px;font-weight:600;color:var(--text)}
+.zonebody{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:0 10px 8px}
+.zonebody .switch{display:inline-flex;gap:6px;align-items:center;color:var(--text)}
+.zonebody .switch input{accent-color:var(--accent);width:16px;height:16px}
+.zlegend{display:inline-flex;gap:6px;align-items:center}
+.zlegend i{display:inline-block;width:13px;height:13px;border:2px solid;margin-left:4px}
+.znote{flex-basis:100%;font-size:11.5px;color:var(--dim)}
+.zonebar select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;font:12.5px var(--mono)}
+.btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.zlist{list-style:none;margin:0;padding:0;font-size:12.5px}
+.zlist li{padding:7px 4px;border-bottom:1px solid var(--line);cursor:pointer;display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 10px}
+.zlist li:hover{background:var(--panel2)}
+.zlist .km{font:600 12px var(--mono);color:var(--accent);grid-row:span 2}
+.zlist .meta{font:11.5px var(--mono);color:var(--muted)}
+.znum{display:inline-block;min-width:20px;height:20px;line-height:20px;margin-right:4px;border-radius:50%;background:#ff3d8b;color:#fff;text-align:center;font:700 11px var(--mono)}
+.lit{color:var(--short)} .shade{color:var(--dim)}
+#missionCard h3{margin-bottom:8px}
+.mdsel{display:flex;flex-wrap:wrap;gap:8px 12px;font-size:12px;color:var(--muted);margin-bottom:8px}
+.mdsel select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:3px 6px;font:12px var(--mono)}
+.md details{border-top:1px solid var(--line)}
+.md summary{cursor:pointer;padding:7px 2px;font-weight:600;font-size:13px;display:flex;gap:6px;align-items:center}
+.md summary::-webkit-details-marker{display:none}
+.md summary::before{content:'▸';color:var(--dim);font-size:11px}
+.md details[open] summary::before{content:'▾'}
+.md .badge{font:600 9.5px var(--mono);text-transform:uppercase;letter-spacing:.05em;padding:1px 5px;border-radius:3px;border:1px solid var(--line);color:var(--dim)}
+.md .badge.sw{color:var(--short);border-color:color-mix(in srgb,var(--short) 50%,transparent)}
+.md .src{font-size:10.5px;color:var(--dim);margin:-2px 2px 6px;line-height:1.35}
+.md .rows{display:grid;grid-template-columns:minmax(0,1fr) auto;font-size:12px;margin-bottom:8px}
+.md .rows div{padding:4px 2px;border-bottom:1px dashed var(--line)}
+.md .rows .v{font-family:var(--mono);text-align:right}
+.md .rows .nd{color:var(--dim);font-style:italic}
+.md .note{font-size:11px;margin:0 2px 8px;color:var(--dim)}
+.md img{width:100%;border-radius:4px;border:1px solid var(--line);display:block;margin:2px 0 4px;background:var(--bg2)}
+.md ul{margin:0 0 8px;padding-left:16px;font-size:11.5px;color:var(--muted)}
+.md li{margin:2px 0}
+.infobox{margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg2);font-size:12.5px}
+.stats .sec{grid-column:1/-1;font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em;padding-top:10px}
+.warnbox{display:none;margin-top:10px;padding:10px;border-radius:9px;background:color-mix(in srgb,var(--danger) 12%,transparent);border:1px solid color-mix(in srgb,var(--danger) 45%,transparent);font-size:13px}
 
 /* charts */
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -80,7 +147,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .why{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px}
 @media (max-width:860px){.why{grid-template-columns:1fr}}
 #reasons{list-style:none;margin:0;padding:0;counter-reset:r}
-#reasons li{position:relative;padding:12px 14px 12px 48px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--panel);font-size:14.5px;color:#e8d9cc}
+#reasons li{position:relative;padding:12px 14px 12px 48px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--panel);font-size:14.5px;color:var(--card-text)}
 #reasons li b{color:var(--text)}
 #reasons li::before{counter-increment:r;content:counter(r);position:absolute;left:12px;top:12px;width:25px;height:25px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);font:600 12px/23px var(--mono);text-align:center;color:var(--accent)}
 .formula{font:13px var(--mono);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin:8px 0;overflow-x:auto}
@@ -90,7 +157,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 @media (max-width:960px){.grid3{grid-template-columns:1fr 1fr}}
 @media (max-width:680px){.grid3,.grid2{grid-template-columns:1fr}}
-.fcard{font-size:14px;color:#e2d2c5}
+.fcard{font-size:14px;color:var(--card-text)}
 .fcard .tag{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
 .fcard p{margin:6px 0}
 .fcard ul{margin:4px 0;padding-left:18px}
@@ -112,8 +179,9 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
 
 <header class="hero">
   <div class="wrap">
-    <div class="kicker">Jezero · rota planlama</div>
-    <h1>Mars gezgini <span>rota haritası</span></h1>
+    <div><div class="kicker">Jezero · route planning</div>
+    <h1>Mars rover <span>route map</span></h1></div>
+    <button class="btn" id="themeToggle" type="button" title="Switch between light and dark theme" aria-label="Switch between light and dark theme">Light</button>
   </div>
 </header>
 
@@ -122,42 +190,87 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
     <div class="card mapcard">
       <div class="maptools">
         <div class="seg" id="layers">
-          <button data-l="elev" class="on">Yükseklik</button>
-          <button data-l="slope">Eğim</button>
-          <button data-l="haz">Tehlike</button>
+          <button data-l="elev" class="on">Elevation</button>
+          <button data-l="slope">Slope</button>
+          <button data-l="haz">Hazard</button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div class="seg" id="mode" title="Route start">
+            <button data-mode="ab">A → B</button>
+            <button data-mode="base" class="on">Base → B</button>
+          </div>
           <div class="seg" id="range">
             <button data-range="jezero" class="on">Jezero</button>
             <button data-range="mars">Mars</button>
           </div>
-          <button class="btn" id="setA" title="İmlecin son bulunduğu arazi noktasını başlangıç yap">A'yı koy</button>
-          <button class="btn" id="setB" title="İmlecin son bulunduğu arazi noktasını varış yap">B'yi koy</button>
-          <button class="btn" id="clear">Temizle</button>
+          <button class="btn" id="setBase" type="button" aria-pressed="false" title="Click this, then click the map or globe to move the base camp (this session only)">Set base</button>
+          <button class="btn" id="resetBase" type="button" title="Move the base back to the centre of the map">Reset base</button>
+          <button class="btn" id="setA" title="Set the last terrain point under the cursor as the start">Set A</button>
+          <button class="btn" id="setB" title="Set the last terrain point under the cursor as the destination">Set B</button>
+          <button class="btn" id="clear">Clear</button>
           <button class="btn" id="swap">A ⇄ B</button>
         </div>
       </div>
+      <details class="zonebar" id="restPanel" open>
+        <summary>Rest stations</summary>
+        <div class="zonebody">
+          <label class="switch"><input type="checkbox" id="zonesToggle" checked> Show all rest stations</label>
+          <label>Sun hour (LTST) <select id="sunHour"></select></label>
+          <span id="zoneSummary"></span>
+          <span class="zlegend"><i style="background:rgba(61,255,176,.6);border-color:#0b3d2a"></i>Sunlit <i style="background:rgba(154,166,192,.6);border-color:#1d2333"></i>Shaded <i style="background:rgba(255,61,139,.75);border-color:#fff"></i>Near route (numbered)</span>
+          <span class="znote">Flat, low-hazard ~1 km tiles for rest or emergency stops. Stations near a calculated route stay visible when this is off.</span>
+        </div>
+      </details>
       <div id="guide"></div>
       <div class="mapbox" id="mapbox">
-        <canvas id="globe" tabindex="0" aria-label="Mars küresi ve Jezero arazi haritası"></canvas>
+        <canvas id="globe" tabindex="0" aria-label="Mars globe and Jezero terrain map"></canvas>
         <div id="scale"><span id="scaleLabel">--</span><div class="bar" id="scaleBar"></div></div>
         <div id="tip"></div>
+        <div id="popup" role="dialog" aria-live="polite" hidden><button class="btn close" id="popupClose" type="button" aria-label="Close">×</button><div id="popupBody"></div></div>
       </div>
       <div class="legend" id="legend"></div>
-      <div class="hint">Arazi üzerinde imleci konumlandırıp A ile başlangıcı, B ile varışı işaretleyin. Küreyi sürükleyerek döndürebilirsiniz.</div>
+      <div class="hint">Point at the terrain and press A to mark the start, B to mark the destination. Drag the globe to rotate it.</div>
     </div>
 
     <aside class="side">
       <div class="card">
-        <h3>Rover rotası</h3>
-        <p class="note">Güvenli rota varsa seçilir. Yoksa en düşük riskli alternatif, tehlikeleriyle birlikte gösterilir.</p>
-        <button class="btn" id="calculate" style="width:100%;margin-top:14px">Hesapla</button>
+        <h3>Rover route</h3>
+        <p class="note">A safe route is chosen if one exists. Otherwise the least-risk alternative is shown, with its hazards.</p>
+        <button class="btn" id="calculate" style="width:100%;margin-top:14px">Calculate</button>
         <div class="warnbox" id="warn"></div>
       </div>
       <div class="card">
-        <h3>Rota özeti</h3>
+        <h3>Route summary</h3>
         <div class="stats" id="stats"></div>
-        <div class="note" style="margin-top:8px;font-size:12px">Eğim kaynağı: CTX 20 m + kısmi HiRISE 1 m. AI arazi değerlerini üretmez.</div>
+        <div class="note" style="margin-top:8px;font-size:10px">Slope source: CTX 20 m + partial HiRISE 1 m. The AI does not generate terrain values.</div>
+      </div>
+      <div class="card" id="missionCard">
+        <h3>Mission data</h3>
+        <div class="mdsel">
+          <label>Local time (LTST) <select id="mdHour"></select></label>
+          <label>Season <select id="mdLs"><option value="all">all</option><option value="0">Ls 0</option><option value="90">Ls 90</option><option value="180">Ls 180</option><option value="270">Ls 270</option></select></label>
+        </div>
+        <div class="md" id="missionBody"><div class="note">Loading…</div></div>
+      </div>
+      <div class="card" id="restCard">
+        <h3>Rest stations along the route</h3>
+        <div class="note" style="font-size:12px;margin-bottom:6px">Flat, low-hazard ~1 km tiles within 2 km of the route, in order. Click one for details.</div>
+        <div id="restSummary" class="note" style="font-size:12.5px"></div>
+        <ul class="zlist" id="restList"></ul>
+      </div>
+      <div class="card" id="travelCard">
+        <h3>Travel time</h3>
+        <p class="note" style="margin:0 0 6px;font-size:12px">Rover for most of the route, on foot for the final part. Fixed planning values (set on the server); only the start time can be changed. Information only; the route does not change.</p>
+        <div class="tgrid">
+          <div><span class="tlabel">Rover speed</span><b class="tval" id="tRover">—</b><small>Apollo LRV design 9–13 km/h; Apollo 15/16 averages were lower (NASA NTRS 20250011301)</small></div>
+          <div><span class="tlabel">Walking speed</span><b class="tval" id="tWalk">—</b><small>2.2 mph, top nominal Apollo walking speed (NASA ICES-2026)</small></div>
+          <div><span class="tlabel">Final walk</span><b class="tval" id="tWalkM">—</b><small>Team assumption</small></div>
+          <div><span class="tlabel">Walk-back limit</span><b class="tval" id="tLimit">—</b><small>NASA JSC 10 km Walkback Test (Apollo)</small></div>
+          <label>Start time (LTST h)<input type="text" inputmode="decimal" autocomplete="off" id="tStart" min="0" max="23.75" step="0.25" value="11"><small>EVA window 11:00–15:00 LTST</small></label>
+        </div>
+        <div class="stats" id="travelStats"></div>
+        <div class="warnbox" id="travelWarn"></div>
+        <div class="infobox" id="travelInfo" hidden></div>
       </div>
     </aside>
   </div>
@@ -165,15 +278,15 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
 
 <section>
   <div class="wrap">
-    <h2>Rota profili</h2>
-    <p class="sub">Rota boyunca yükseklik ve eğim. Grafiğin üzerinde gezinince haritada o nokta işaretlenir.</p>
+    <h2>Route profile</h2>
+    <p class="sub">Elevation and slope along the route. Hover over a chart to mark that point on the map.</p>
     <div class="charts">
       <div class="card chart">
-        <div class="cap"><span>Yükseklik (m, göreli)</span><span><span style="color:var(--safe)">━</span> Rover rotası</span></div>
+        <div class="cap"><span>Elevation (m, relative)</span><span><span style="color:var(--safe)">━</span> Rover route</span></div>
         <canvas id="chElev"></canvas>
       </div>
       <div class="card chart">
-        <div class="cap"><span>Eğim (°)</span><span><span style="color:var(--safe)">━</span> Rover rotası</span></div>
+        <div class="cap"><span>Slope (°)</span><span><span style="color:var(--safe)">━</span> Rover route</span></div>
         <canvas id="chSlope"></canvas>
       </div>
     </div>
@@ -184,15 +297,15 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
 <section>
   <div class="wrap why">
     <div>
-      <h2>Bu rota neden seçildi?</h2>
-      <p class="sub">Özet, gerçek arazi metrikleri ve hesaplanan rota üzerinden hazırlanır.</p>
+      <h2>Why this route?</h2>
+      <p class="sub">The summary is built from real terrain metrics and the computed route.</p>
       <ol id="reasons"></ol>
     </div>
     <div>
       <div class="card">
-        <h3>Veri ve yöntem</h3>
-        <p class="note">Rota motoru gerçek CTX ve HiRISE türetilmiş arazi hücrelerini kullanır. Model eğim veya yükseklik üretmez.</p>
-        <p class="note">AI rotayı değiştirmez; yalnızca doğrulanmış metrikleri Türkçe bir rota özeti ve navigasyon önerisine dönüştürür.</p>
+        <h3>Data and method</h3>
+        <p class="note">The route engine uses real terrain cells derived from CTX and HiRISE. The model does not generate slope or elevation.</p>
+        <p class="note">The AI does not change the route; it only turns the verified metrics into an English route summary and navigation advice.</p>
       </div>
     </div>
   </div>
@@ -200,52 +313,52 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
 
 <section class="secondary-content">
   <div class="wrap">
-    <h2>Bir aracın aldığı yolu neler etkiler?</h2>
-    <p class="sub">Eğimli arazide ilerleyen bir aracın ne kadar yol alacağını belirleyen etkenler ve her birinin Mars'ta nasıl değiştiği.</p>
+    <h2>What affects how far a vehicle travels?</h2>
+    <p class="sub">The factors that set how far a vehicle travels on sloped ground, and how each one changes on Mars.</p>
     <div class="grid2">
-      <div class="card fcard"><div class="tag">01 · İlk hız (v₀)</div>
-        <p>En etkili faktör budur. Alınan yol hızın karesiyle artar: hız iki katına çıkarsa yol yaklaşık dört katına çıkar.</p>
-        <div class="mars"><b>Mars'ta:</b> Gezginler çok yavaştır; Perseverance'ın azami hızı saatte yaklaşık 150 metredir. Bu hızda araç neredeyse anında durur.</div></div>
-      <div class="card fcard"><div class="tag">02 · Eğim açısı (θ)</div>
-        <p>Rampa dikleştikçe yer çekiminin yola paralel bileşeni (mg·sinθ) büyür.</p>
-        <ul><li>Yukarı çıkan araç daha çabuk yavaşlar, daha kısa yol alır.</li><li>Aşağı inen araç daha hızlı ivmelenir.</li></ul>
-        <div class="mars"><b>Mars'ta:</b> Curiosity ve Perseverance 45°'lik yatmaya devrilmeden dayanacak biçimde tasarlandı, ama sürücüler 30°'den dik eğimlerden kaçınır. Bu simülasyonun varsayılan sınırı daha da temkinli: 20°.</div></div>
-      <div class="card fcard"><div class="tag">03 · Sürtünme katsayısı (μ)</div>
-        <p>Yolun yüzeyine (asfalt, buz, toprak) ve lastiklerin durumuna bağlıdır. Sürtünme kuvveti μ·mg·cosθ olduğundan sürtünme arttıkça alınan yol kısalır.</p>
-        <div class="mars"><b>Mars'ta:</b> Yüzey gevşek kum, toz ve kayadan oluşur. Yumuşak kumda tekerlekler patinaj yapar; haritadaki sarı alanlar bu yüzden cezalıdır.</div></div>
-      <div class="card fcard"><div class="tag">04 · Yer çekimi ivmesi (g)</div>
-        <p>Dünya'da yaklaşık 9,8 m/s²'dir. Yer çekimi azaldıkça aynı rampada araç daha uzağa gider.</p>
-        <div class="mars"><b>Mars'ta:</b> g ≈ 3,72 m/s². Aynı hız ve aynı rampada araç Dünya'dakinin yaklaşık 2,6 katı yol alır; Ay'da (1,62 m/s²) bu oran yaklaşık 6 kattır. Fren mesafesi de aynı oranda uzar.</div></div>
-      <div class="card fcard"><div class="tag">05 · Hava direnci</div>
-        <p>Hız, aracın şekli (aerodinamik yapısı) ve ön yüzey alanı arttıkça etkisi büyür.</p>
-        <div class="mars"><b>Mars'ta:</b> Atmosfer yoğunluğu Dünya'nınkinin yaklaşık %1,6'sıdır; aynı hızda hava direnci 60 kat kadar küçüktür ve gezgin hızlarında yok sayılır.</div></div>
-      <div class="card fcard"><div class="tag">06 · Yuvarlanma direnci</div>
-        <p>Lastik basıncına, lastik tipine ve aracın ağırlığına bağlıdır.</p>
-        <div class="mars"><b>Mars'ta:</b> Gezginlerde havalı lastik yoktur; Curiosity ve Perseverance alüminyum tekerlek kullanır. Tekerlek yumuşak zemine gömüldükçe yuvarlanma direnci hızla artar.</div></div>
-      <div class="card fcard"><div class="tag">07 · Motor gücü ve fren</div>
-        <p>Araç motorla itiliyorsa ya da fren yapıyorsa bunlar da alınan yolu doğrudan belirler.</p>
-        <div class="mars"><b>Mars'ta:</b> Gezginler elektrik motorlarıyla sürülür. Curiosity ve Perseverance'ın radyoizotop jeneratörü yaklaşık 110 W üretir; güç sınırlı olduğu için her tırmanışın enerji bedeli önemlidir.</div></div>
-      <div class="card fcard" style="border-color:#5a3a22"><div class="tag">Kütle hakkında not</div>
-        <p>İdeal durumda, yani hava direnci yokken kütle alınan yolu etkilemez. Hem yer çekimi hem sürtünme kütleyle orantılı olduğu için kütle denklemde sadeleşir.</p>
-        <div class="mars"><b>Mars'ta:</b> Hava direnci neredeyse sıfır olduğundan bu ideal durum Mars'ta Dünya'dakinden daha iyi geçerlidir.</div></div>
+      <div class="card fcard"><div class="tag">01 · Initial speed (v₀)</div>
+        <p>This is the strongest factor. Distance grows with the square of speed: double the speed and the distance roughly quadruples.</p>
+        <div class="mars"><b>On Mars:</b> Rovers are very slow; Perseverance tops out at about 150 metres per hour. At that speed the vehicle stops almost instantly.</div></div>
+      <div class="card fcard"><div class="tag">02 · Slope angle (θ)</div>
+        <p>The steeper the ramp, the larger the component of gravity along the path (mg·sinθ).</p>
+        <ul><li>A vehicle going uphill slows down sooner and travels less.</li><li>A vehicle going downhill accelerates faster.</li></ul>
+        <div class="mars"><b>On Mars:</b> Curiosity and Perseverance were designed to withstand a 45° tilt without tipping over, but drivers avoid slopes steeper than 30°. This simulation's default limit is even more cautious: 20°.</div></div>
+      <div class="card fcard"><div class="tag">03 · Friction coefficient (μ)</div>
+        <p>It depends on the surface (asphalt, ice, soil) and the state of the tyres. The friction force is μ·mg·cosθ, so more friction means a shorter distance.</p>
+        <div class="mars"><b>On Mars:</b> The surface is loose sand, dust and rock. Wheels slip in soft sand, which is why the yellow areas on the map are penalised.</div></div>
+      <div class="card fcard"><div class="tag">04 · Gravitational acceleration (g)</div>
+        <p>On Earth it is about 9.8 m/s². With weaker gravity, a vehicle travels further on the same ramp.</p>
+        <div class="mars"><b>On Mars:</b> g ≈ 3.72 m/s². At the same speed on the same ramp a vehicle travels about 2.6 times as far as on Earth; on the Moon (1.62 m/s²) the ratio is about 6. Braking distance grows by the same ratio.</div></div>
+      <div class="card fcard"><div class="tag">05 · Air resistance</div>
+        <p>Its effect grows with speed, the vehicle's shape (aerodynamics) and its frontal area.</p>
+        <div class="mars"><b>On Mars:</b> The atmosphere is about 1.6% as dense as Earth's; at the same speed air resistance is about 60 times smaller and is negligible at rover speeds.</div></div>
+      <div class="card fcard"><div class="tag">06 · Rolling resistance</div>
+        <p>It depends on tyre pressure, tyre type and the vehicle's weight.</p>
+        <div class="mars"><b>On Mars:</b> Rovers have no pneumatic tyres; Curiosity and Perseverance use aluminium wheels. Rolling resistance rises quickly as a wheel sinks into soft ground.</div></div>
+      <div class="card fcard"><div class="tag">07 · Motor power and brakes</div>
+        <p>If the vehicle is driven by a motor or is braking, these also directly set the distance.</p>
+        <div class="mars"><b>On Mars:</b> Rovers are driven by electric motors. The radioisotope generator on Curiosity and Perseverance produces about 110 W; power is limited, so the energy cost of every climb matters.</div></div>
+      <div class="card fcard" style="border-color:#5a3a22"><div class="tag">A note on mass</div>
+        <p>In the ideal case, with no air resistance, mass does not affect the distance. Gravity and friction are both proportional to mass, so mass cancels out of the equation.</p>
+        <div class="mars"><b>On Mars:</b> Air resistance is nearly zero, so this ideal case holds better on Mars than on Earth.</div></div>
     </div>
 
     <div class="card" style="margin-top:14px">
-      <h3>Durma mesafesi hesaplayıcı</h3>
-      <p class="note" style="margin:0">Aynı araç, aynı hız ve aynı eğimde Mars'ta, Dünya'da ve Ay'da durana kadar ne kadar yol alır?</p>
+      <h3>Stopping distance calculator</h3>
+      <p class="note" style="margin:0">How far does the same vehicle, at the same speed and slope, travel before stopping on Mars, Earth and the Moon?</p>
       <div class="calc">
         <div>
-          <div class="ctrl"><label>İlk hız (v₀) <b id="cVv"></b></label><input type="range" id="cV" min="0.5" max="30" step="0.5" value="5"></div>
-          <div class="ctrl"><label>Eğim açısı (θ) <b id="cTv"></b></label><input type="range" id="cT" min="0" max="40" step="0.5" value="10"></div>
-          <div class="ctrl"><label>Sürtünme katsayısı (μ) <b id="cMuv"></b></label><input type="range" id="cMu" min="0.05" max="1" step="0.05" value="0.5"></div>
-          <div class="ctrl"><label>Yön</label><select id="cDir"><option value="up">Yokuş yukarı (motor kapalı, frenli)</option><option value="down">Yokuş aşağı (frenleyerek)</option></select></div>
-          <button class="btn" id="cRoute">Rotadaki en dik eğimi kullan</button>
+          <div class="ctrl"><label>Initial speed (v₀) <b id="cVv"></b></label><input type="range" id="cV" min="0.5" max="30" step="0.5" value="5"></div>
+          <div class="ctrl"><label>Slope angle (θ) <b id="cTv"></b></label><input type="range" id="cT" min="0" max="40" step="0.5" value="10"></div>
+          <div class="ctrl"><label>Friction coefficient (μ) <b id="cMuv"></b></label><input type="range" id="cMu" min="0.05" max="1" step="0.05" value="0.5"></div>
+          <div class="ctrl"><label>Direction</label><select id="cDir"><option value="up">Uphill (motor off, braking)</option><option value="down">Downhill (braking)</option></select></div>
+          <button class="btn" id="cRoute">Use the route's max slope</button>
         </div>
         <div>
           <div id="cBars"></div>
           <div class="note" id="cOut"></div>
           <div class="formula" id="cFormula" style="color:var(--short)"></div>
-          <div class="note" style="font-size:12px">Hesap hava ve yuvarlanma direncini yok sayar; μ, frenleme sırasındaki etkin sürtünme katsayısıdır. Kütle sadeleştiği için sonuca girmez.</div>
+          <div class="note" style="font-size:12px">The calculation ignores air and rolling resistance; μ is the effective friction coefficient while braking. Mass cancels out, so it does not enter the result.</div>
         </div>
       </div>
     </div>
@@ -254,31 +367,31 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
 
 <section class="secondary-content">
   <div class="wrap">
-    <h2>Gerçek görevlerden dersler</h2>
-    <p class="sub">Simülasyondaki cezaların her biri, Mars'ta gerçekten yaşanmış bir sorundan geliyor.</p>
+    <h2>Lessons from real missions</h2>
+    <p class="sub">Every penalty in the simulation comes from a problem that really happened on Mars.</p>
     <div class="grid3">
-      <div class="card fcard"><div class="tag">Yan eğim</div><h3>Yokuş yukarı ile yamaç boyunca aynı şey değil</h3>
-        <p>Aynı yamaçta gezgin <b>düz yukarı</b> çıkarsa tekerlekler kayar ve enerji artar, ama devrilme riski düşüktür. <b>Yamaç boyunca yan</b> giderse gövde yana yatar; devrilme ve yana kayma riski büyür.</p>
-        <p>Algoritma bu yüzden eğimi hareket yönündeki ve yanal bileşen olarak ikiye ayırıp ayrı ayrı cezalandırır.</p>
-        <div class="formula">ileri = g·u &nbsp; yanal = |g × u|</div></div>
-      <div class="card fcard"><div class="tag">Yumuşak kum</div><h3>Düz ama tehlikeli</h3>
-        <p>Kum alanları neredeyse düzdür, yani eğim haritasında zararsız görünür. Ama tekerlekler gömülebilir.</p>
-        <p>Opportunity 2005'te “Purgatory” adlı kum dalgasına saplandı ve ancak yaklaşık beş haftada kurtarıldı. Spirit 2009'da “Troy” bölgesinde yumuşak toprağa saplandı; kurtarılamadı ve 2010'da iletişim kesildi.</p></div>
-      <div class="card fcard"><div class="tag">Kayalar</div><h3>Tekerlek hasarı</h3>
-        <p>Keskin kayalar tekerlekleri deler; büyük kayalar gövdenin altına takılır. Curiosity'nin alüminyum tekerleklerinde 2013'te beklenenden hızlı delik ve yırtıklar görülünce ekip rotaları daha yumuşak zeminlerden geçirmeye başladı.</p>
-        <p>Kaya yoğunluğu en çok <b>krater kenarlarında</b> (çarpmayla saçılan parçalar) ve dik sırt yamaçlarında yüksektir.</p></div>
-      <div class="card fcard"><div class="tag">Haritalama</div><h3>Yörüngeden yükseklik modeli</h3>
-        <p>Mars Reconnaissance Orbiter'daki HiRISE kamerası yüzeyi piksel başına yaklaşık 25–30 cm ayrıntıyla görüntüler. İki farklı açıdan çekilen görüntülerden <b>sayısal yükseklik modeli</b> üretilir; eğim ve tehlike haritaları bu modelden çıkarılır.</p></div>
-      <div class="card fcard"><div class="tag">Otonomi</div><h3>Yerde kendi kararını veren gezgin</h3>
-        <p>Dünya'daki ekip uzun rotayı yörünge haritalarıyla planlar. Perseverance ise AutoNav sistemiyle önündeki araziyi kendi kameralarıyla görür ve yakın engellerden sürüş sırasında kendisi kaçınır.</p></div>
-      <div class="card fcard"><div class="tag">Bu sayfa</div><h3>Basitleştirilmiş bir model</h3>
-        <p>Bu örnekte rota, simüle arazi verileriyle bir AI modelinden istenir. Gerçek planlamada güneş açısı, iletişim pencereleri, araç durumu ve bilimsel hedefler de hesaba girer; model çıktısı görev güvenliği için tek başına yeterli değildir.</p></div>
+      <div class="card fcard"><div class="tag">Cross slope</div><h3>Going uphill is not the same as going across a slope</h3>
+        <p>On the same slope, a rover driving <b>straight up</b> slips and uses more energy, but its tip-over risk is low. Driving <b>sideways across the slope</b> tilts the body; the risk of tipping and sliding sideways grows.</p>
+        <p>That is why the algorithm splits slope into an along-track and a cross-track component and penalises each separately.</p>
+        <div class="formula">along = g·u &nbsp; cross = |g × u|</div></div>
+      <div class="card fcard"><div class="tag">Soft sand</div><h3>Flat but dangerous</h3>
+        <p>Sand fields are almost flat, so they look harmless on a slope map. But wheels can sink in.</p>
+        <p>In 2005 Opportunity got stuck in a sand ripple named “Purgatory” and took about five weeks to free. In 2009 Spirit got stuck in soft soil at “Troy”; it could not be freed and contact was lost in 2010.</p></div>
+      <div class="card fcard"><div class="tag">Rocks</div><h3>Wheel damage</h3>
+        <p>Sharp rocks puncture wheels; large rocks catch under the body. When holes and tears appeared faster than expected on Curiosity's aluminium wheels in 2013, the team began routing it over softer ground.</p>
+        <p>Rock density is highest on <b>crater rims</b> (impact ejecta) and on steep ridge slopes.</p></div>
+      <div class="card fcard"><div class="tag">Mapping</div><h3>Elevation models from orbit</h3>
+        <p>The HiRISE camera on Mars Reconnaissance Orbiter images the surface at about 25–30 cm per pixel. Images taken from two angles produce a <b>digital elevation model</b>; slope and hazard maps are derived from it.</p></div>
+      <div class="card fcard"><div class="tag">Autonomy</div><h3>A rover that decides on the ground</h3>
+        <p>The team on Earth plans the long route with orbital maps. Perseverance then uses its AutoNav system to see the terrain ahead with its own cameras and avoids nearby obstacles by itself while driving.</p></div>
+      <div class="card fcard"><div class="tag">This page</div><h3>A simplified model</h3>
+        <p>Here the route is computed from terrain data and explained by an AI model. Real planning also accounts for sun angle, communication windows, vehicle health and science goals; this output alone is not enough for mission safety.</p></div>
     </div>
   </div>
 </section>
 
 <footer>
-  <div class="wrap">Jezero çalışma alanı · CTX DEM ve kısmi HiRISE türetilmiş eğim verisi. Rotalar görev planlaması yerine geçmez.</div>
+  <div class="wrap">Jezero study area · CTX DEM and partial HiRISE-derived slope data. Routes are not a substitute for mission planning.</div>
 </footer>
 
 <script type="importmap">
@@ -298,8 +411,22 @@ renderer.setSize(880,880,false); renderer.outputColorSpace=THREE.SRGBColorSpace;
 const scene=new THREE.Scene(); scene.background=new THREE.Color(0x050607);
 const camera=new THREE.PerspectiveCamera(36,1,0.0001,20);
 const controls=new OrbitControls(camera,renderer.domElement);
-controls.enablePan=false; controls.enableDamping=true; controls.dampingFactor=0.06;
+controls.enablePan=false; controls.enableDamping=true; controls.dampingFactor=0.12;
 controls.minDistance=1.00015; controls.maxDistance=5;
+// Altitude-scaled input (globe radius = 1). OrbitControls rotates 2π·rotateSpeed per canvas height of drag,
+// while the visible ground spans about 2·h·tan(fov/2) ≈ 0.65·h radians, so rotateSpeed ≈ 0.10·h keeps the
+// ground under the cursor. 0.12·h is just above that: precise near Jezero, normal when far away.
+// Each wheel notch multiplies distance-to-centre by 0.95^zoomSpeed; solve for ≈10% altitude change per notch.
+const ROTATE_K=0.12, ROTATE_MIN=0.00001, ROTATE_MAX=0.8, ZOOM_STEP=0.10, ZOOM_MAX=0.6;
+function scaleControls(){
+  const d=camera.position.length(), h=Math.max(d-1,0.00001);
+  controls.rotateSpeed=Math.min(ROTATE_MAX,Math.max(ROTATE_MIN,ROTATE_K*h));
+  // OrbitControls divides wheel delta by 100·devicePixelRatio; undo that so a notch is the same on retina screens.
+  const dpr=Math.max(1,window.devicePixelRatio|0);
+  controls.zoomSpeed=dpr*Math.min(ZOOM_MAX,Math.max(0.000001,Math.log(1-ZOOM_STEP*h/d)/Math.log(0.95)));
+}
+// Refresh before OrbitControls handles each event too, so fast wheel bursts never use a stale speed.
+['wheel','pointerdown','pointermove'].forEach(type=>canvas.parentElement.addEventListener(type,scaleControls,{capture:true,passive:true}));
 const ambient=new THREE.AmbientLight(0xffffff,0.8); scene.add(ambient);
 const sun=new THREE.DirectionalLight(0xffffff,2.1); sun.position.set(-2,3,4); scene.add(sun);
 const globeGroup=new THREE.Group(); scene.add(globeGroup);
@@ -313,12 +440,14 @@ const offscreen=document.createElement('canvas'), tileContext=offscreen.getConte
 const tileTexture=new THREE.CanvasTexture(offscreen); tileTexture.colorSpace=THREE.SRGBColorSpace;
 let terrainMesh=null, terrainImage=null, rangeMode='jezero', layer='elev';
 let T={h:new Float32Array(W*H),hMax:1,slope:new Float32Array(W*H),rock:new Float32Array(W*H),sand:new Float32Array(W*H)};
+let MISSION=null, missionLoaded=false, seasonLs='all';
+let routeMode='base', BASE=null, DEFAULT_BASE=null, pickingBase=false, ZONES=null, showZones=true, sunHour=13;
 let A=null, B=null, example=false, safe=null, routeLoading=false, routeError='';
 let terrainReady=false, hoverPoint=null, selectionPoint=null, hoverX=null, press=null, drag=null;
 
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
-const fm=v=>Math.round(v).toLocaleString('tr-TR');
-const f1=v=>v.toLocaleString('tr-TR',{minimumFractionDigits:1,maximumFractionDigits:1});
+const fm=v=>Math.round(v).toLocaleString('en-US');
+const f1=v=>v.toLocaleString('en-US',{minimumFractionDigits:1,maximumFractionDigits:1});
 const colorStops=[[0,[23,58,74]],[0.16,[20,125,130]],[0.36,[98,170,104]],[0.58,[209,198,76]],[0.8,[229,138,61]],[1,[255,240,176]]];
 function colorRamp(value){
   const t=clamp(value,0,1);
@@ -355,8 +484,13 @@ function loadGlobeTexture(){
     sphere.material.map=terrainImage; sphere.material.needsUpdate=true;
   },undefined,error=>{console.error('Mars globe texture failed to load',error);});
 }
+function jezeroLookAt(){
+  if(BASE?.available) return {lon:BASE.lon,lat:BASE.lat};
+  if(T.bounds) return {lon:(T.bounds.west+T.bounds.east)/2,lat:(T.bounds.south+T.bounds.north)/2};
+  return {lon:77.69,lat:18.41}; // before the terrain loads: Jezero (IAU gazetteer centre, terrain_meta.json)
+}
 function setCamera(distance){
-  const direction=geoVector(77.69,18.41).normalize();
+  const look=jezeroLookAt(), direction=geoVector(look.lon,look.lat).normalize();
   camera.position.copy(direction.multiplyScalar(distance)); camera.up.set(0,1,0);
   controls.target.set(0,0,0); controls.update();
 }
@@ -380,15 +514,16 @@ function updateScale(){
   $('scaleLabel').textContent=label;
   $('scaleBar').style.width=`${width}px`;
 }
-function animateGlobe(){requestAnimationFrame(animateGlobe);controls.update();renderer.render(scene,camera);}
+function animateGlobe(){requestAnimationFrame(animateGlobe);stepFlight();scaleControls();controls.update();updateZoneLayer();renderer.render(scene,camera);}
 controls.addEventListener('change',updateScale);
 
 function renderLegend(){
-  const common='<span><span class="sw" style="background:var(--safe)"></span>Hesaplanan rota</span><span>Jezero veri alanında nokta seçimi</span>';
+  const common='<span><span class="sw" style="background:var(--safe)"></span>Computed route</span>'+
+    '<span>Pick points inside the Jezero data area; click a rest station for details (use Set A/B or the A/B keys to route into one)</span>';
   const detail=layer==='slope'
-    ? `<span>Yeşil → kırmızı eğim · kırmızı alanlar &gt; ${P.limit}°</span>`
-    : layer==='haz' ? '<span>Kırmızı alanlar rover için geçilemez eğim</span>'
-      : '<span>Alçak <span class="grad" style="background:linear-gradient(90deg,#173a4a,#147d82,#62aa68,#d1c64c,#e58a3d,#fff0b0)"></span>Yüksek · CTX/HiRISE</span>';
+    ? `<span>Green → red slope · red areas &gt; ${P.limit}°</span>`
+    : layer==='haz' ? '<span>Red areas: slope impassable for the rover</span>'
+      : '<span>Low <span class="grad" style="background:linear-gradient(90deg,#173a4a,#147d82,#62aa68,#d1c64c,#e58a3d,#fff0b0)"></span>High · CTX/HiRISE</span>';
   $('legend').innerHTML=detail+common;
 }
 function renderTerrainTexture(){
@@ -461,6 +596,206 @@ function addMarker(point,label,color){
   sprite.position.copy(position.clone().normalize().multiplyScalar(position.length()+0.0002));
   sprite.scale.setScalar(0.00055);overlayGroup.add(sprite);
 }
+function surfaceAt(lon,lat,offset=0.00016){
+  const p=T.bounds?geoToPoint(lon,lat):null;
+  let radius=1+offset;
+  if(p){ const i=Math.round(p.y/(H-1)*(T.renderHeight-1))*T.renderWidth+Math.round(p.x/(W-1)*(T.renderWidth-1)); radius=1+((T.renderH[i]??0))/MARS_RADIUS_M+offset; }
+  return geoVector(lon,lat,radius);
+}
+function nearRouteIds(){ return new Set((safe?.restZones?.zones||[]).map(z=>z.id)); }
+// Rest stations are drawn on top of the imagery (no depth test) so the terrain texture never hides them.
+// Each station has a world-size tile (fill + thick border ring) and a fixed-pixel square marker, so it stays
+// visible and clickable at every zoom level. Stations near the route get a bright fill and a numbered label.
+const zoneLayer=new THREE.Group(); zoneLayer.renderOrder=6; globeGroup.add(zoneLayer);
+let zoneMarkerTextures=null, zoneHitList=[];
+function squareTexture(fill,border,borderPx){
+  const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  g.fillStyle=fill; g.fillRect(0,0,64,64); g.lineWidth=borderPx; g.strokeStyle=border; g.strokeRect(borderPx/2,borderPx/2,64-borderPx,64-borderPx);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+function numberSprite(n){
+  const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  g.beginPath(); g.arc(32,32,26,0,Math.PI*2); g.fillStyle='#ff3d8b'; g.fill(); g.lineWidth=5; g.strokeStyle='#fff'; g.stroke();
+  g.fillStyle='#fff'; g.font='700 30px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(String(n),32,34);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false,depthWrite:false,sizeAttenuation:false}));
+  s.scale.setScalar(0.027); s.renderOrder=9; return s;
+}
+const ZONE_STYLE={near:{fill:0xff3d8b,opacity:0.55,ring:0xffffff},lit:{fill:0x3dffb0,opacity:0.42,ring:0x0b3d2a},shade:{fill:0x9aa6c0,opacity:0.42,ring:0x1d2333}};
+function zoneKind(z,near){ return near.has(z.id)?'near':(z.sunlit?'lit':'shade'); }
+function clearZoneLayer(){
+  while(zoneLayer.children.length){ const o=zoneLayer.children.pop(); o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }
+}
+function addZoneTiles(){
+  clearZoneLayer(); zoneHitList=[];
+  if(!ZONES?.zones?.length||!T.renderH) return;
+  const nearList=safe?.restZones?.zones||[], near=new Set(nearList.map(z=>z.id));
+  // panel off: only stations near the current route stay visible
+  const zones=showZones?ZONES.zones:ZONES.zones.filter(z=>near.has(z.id));
+  if(!zones.length) return;
+  const fills={near:[],lit:[],shade:[]}, rings={near:[],lit:[],shade:[]}, markers={near:[],lit:[],shade:[]};
+  const n=4;
+  for(const z of zones){
+    const kind=zoneKind(z,near), bb=z.bounds, w=bb.east-bb.west, h=bb.north-bb.south;
+    const at=(fx,fy)=>surfaceAt(bb.west+w*fx,bb.north-h*fy,0.00022);
+    for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+      const p=at(j/n,i/n),q=at(j/n,(i+1)/n),r=at((j+1)/n,i/n),t=at((j+1)/n,(i+1)/n); fills[kind].push(p,q,r,r,q,t);
+    }
+    // thick border: a ring of quads, 9% of the tile wide (14% for stations near the route)
+    const k=kind==='near'?0.14:0.09;
+    const ringQuad=(x0,y0,x1,y1)=>{ const p=at(x0,y0),q=at(x0,y1),r=at(x1,y0),t=at(x1,y1); rings[kind].push(p,q,r,r,q,t); };
+    ringQuad(0,0,1,k); ringQuad(0,1-k,1,1); ringQuad(0,k,k,1-k); ringQuad(1-k,k,1,1-k);
+    const centre=surfaceAt(z.lon,z.lat,0.00026);
+    markers[kind].push(centre);
+    zoneHitList.push({zone:z,pos:centre,near:kind==='near'});
+  }
+  if(!zoneMarkerTextures) zoneMarkerTextures={near:squareTexture('rgba(255,61,139,.75)','#ffffff',12),lit:squareTexture('rgba(61,255,176,.6)','#0b3d2a',10),shade:squareTexture('rgba(154,166,192,.6)','#1d2333',10)};
+  for(const kind of ['shade','lit','near']){
+    const st=ZONE_STYLE[kind];
+    if(fills[kind].length){
+      const m=new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(fills[kind]),new THREE.MeshBasicMaterial({color:st.fill,transparent:true,opacity:st.opacity,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));
+      m.renderOrder=kind==='near'?8:7; zoneLayer.add(m);
+      const r=new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(rings[kind]),new THREE.MeshBasicMaterial({color:st.ring,transparent:true,opacity:0.95,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));
+      r.renderOrder=kind==='near'?8:7; zoneLayer.add(r);
+      const pts=new THREE.Points(new THREE.BufferGeometry().setFromPoints(markers[kind]),new THREE.PointsMaterial({map:zoneMarkerTextures[kind],size:kind==='near'?16:10,sizeAttenuation:false,transparent:true,depthTest:false,depthWrite:false}));
+      pts.renderOrder=kind==='near'?8:7; pts.name='zoneMarkers'; zoneLayer.add(pts);
+    }
+  }
+  nearList.forEach((z,i)=>{ const full=ZONES.zones.find(x=>x.id===z.id)||z; const sp=numberSprite(i+1); sp.position.copy(surfaceAt(full.lon,full.lat,0.0003)); sp.center.set(0.5,-0.25); zoneLayer.add(sp); });
+}
+// show the layer only when Jezero faces the camera (no depth test, so it would otherwise show through the planet),
+// and hide the fixed-pixel markers once a tile is bigger on screen than its marker
+function updateZoneLayer(){
+  if(!zoneLayer.children.length) return;
+  const look=jezeroLookAt(), dir=geoVector(look.lon,look.lat).normalize();
+  zoneLayer.visible=camera.position.dot(dir)>1.0005;
+  const rect=canvas.getBoundingClientRect(); if(!rect.height) return;
+  const altitude=Math.max(camera.position.length()-1,0.00001);
+  const tilePx=1020/(2*altitude*Math.tan(camera.fov/2/DEG)*MARS_RADIUS_M/rect.height);
+  for(const o of zoneLayer.children) if(o.name==='zoneMarkers') o.visible=tilePx<18;
+}
+function zoneAtScreen(event){
+  if(!zoneLayer.visible||!zoneHitList.length) return null;
+  const rect=canvas.getBoundingClientRect();
+  const altitude=Math.max(camera.position.length()-1,0.00001);
+  const halfTilePx=510/(2*altitude*Math.tan(camera.fov/2/DEG)*MARS_RADIUS_M/rect.height);
+  let best=null, bestD=Infinity;
+  for(const h of zoneHitList){
+    const p=h.pos.clone().applyMatrix4(globeGroup.matrixWorld).project(camera);
+    if(p.z>1) continue;
+    const x=(p.x+1)/2*rect.width+rect.left, y=(1-p.y)/2*rect.height+rect.top;
+    const dx=Math.abs(event.clientX-x), dy=Math.abs(event.clientY-y);
+    const reach=Math.max(halfTilePx,h.near?10:7);
+    if(dx<=reach&&dy<=reach){ const d=dx+dy; if(d<bestD){ bestD=d; best=h.zone; } }
+  }
+  return best;
+}
+let flight=null;
+function flyTo(lon,lat,altitude=0.005){
+  const from=camera.position.clone(), to=geoVector(lon,lat).normalize().multiplyScalar(1+altitude);
+  flight={from,to,t0:performance.now(),ms:700};
+}
+function stepFlight(){
+  if(!flight) return;
+  const t=Math.min(1,(performance.now()-flight.t0)/flight.ms), e=t*t*(3-2*t);
+  const dir=flight.from.clone().normalize().lerp(flight.to.clone().normalize(),e).normalize();
+  const len=flight.from.length()+(flight.to.length()-flight.from.length())*e;
+  camera.position.copy(dir.multiplyScalar(len)); controls.update(); updateScale();
+  if(t>=1) flight=null;
+}
+function showZonePopup(zone){
+  const nearInfo=(safe?.restZones?.zones||[]).find(z=>z.id===zone.id);
+  const sun=ZONES?.sun, site=ZONES?.site_wide||{};
+  const light=zone.sunlit?`<span class="lit">sunlit</span> (${f2(zone.illumination,2)})`:`<span class="shade">shaded</span>${zone.shade_reason?' – '+zone.shade_reason:''}`;
+  const v=(x,u,d=1)=>Number.isFinite(x)?f2(x,d)+u:'no data';
+  showPopup(`<h4>Rest station ${zone.id}</h4><div class="kv">
+    <div>Score (0–100)</div><div class="v">${f1(zone.score)}</div>
+    <div>Mean slope</div><div class="v">${f2(zone.mean_slope_deg)}°</div>
+    <div>Max slope (one 60 m cell)</div><div class="v">${f2(zone.max_slope_deg)}°</div>
+    <div>Relief (max − min)</div><div class="v">${f1(zone.relief_m)} m</div>
+    <div>Passable cells</div><div class="v">${f1(zone.passable_share_pct)}%</div>
+    <div>Crater/basin penalty</div><div class="v">${f2(zone.mean_depression_penalty,3)}</div>
+    <div>Tile size</div><div class="v">${f2(zone.size_m/1000,2)} km</div></div>
+    <div class="tag">Sun at ${String(sun?.hour_ltst??sunHour).padStart(2,'0')}:00 LTST</div><div class="kv">
+    <div>Sun elevation</div><div class="v">${v(sun?.elevation_deg,'°')}</div>
+    <div>Sun azimuth</div><div class="v">${v(sun?.azimuth_deg,'°')}</div>
+    <div>Illumination</div><div class="v">${light}</div></div>
+    <div class="tag">Site-wide (Perseverance MEDA / Curiosity RAD)</div><div class="kv">
+    <div>Air temperature</div><div class="v">${v(site.air_temp_c,' °C')}</div>
+    <div>Ground temperature</div><div class="v">${v(site.ground_temp_c,' °C')}</div>
+    <div>Radiation (Gale)</div><div class="v">${v(site.radiation_msv_per_day,' mSv/day',2)}</div></div>
+    <div class="tag">Distances</div><div class="kv">
+    <div>To base</div><div class="v">${zone.distance_to_base_m==null?'—':f2(zone.distance_to_base_m/1000,2)+' km'}</div>
+    <div>To route</div><div class="v">${nearInfo?f2(nearInfo.distance_to_route_m/1000,2)+' km (at route km '+f2(nearInfo.route_km,2)+')':(safe?'more than 2 km':'no route yet')}</div></div>
+    <div class="muted">${sun?.season_note||''}. Temperature and radiation are single site values; stations are not ranked by them.</div>`);
+}
+async function loadRestZones(){
+  try{
+    const response=await fetch('/rest-zones?hour='+sunHour+(seasonLs==='all'?'':'&ls='+seasonLs)+(BASE?.available?`&baseLon=${BASE.lon}&baseLat=${BASE.lat}`:''));
+    if(!response.ok) throw new Error();
+    ZONES=await response.json();
+    $('zoneSummary').textContent=`${ZONES.count} stations · sun ${f1(ZONES.sun.elevation_deg)}° · ${ZONES.zones.filter(z=>z.sunlit).length} sunlit`;
+  }catch(error){ ZONES=null; $('zoneSummary').textContent='Rest stations unavailable'; }
+  drawOverlay();
+}
+function renderRestList(){
+  const list=$('restList'), sum=$('restSummary'), rz=safe?.restZones;
+  list.replaceChildren();
+  if(!rz){ sum.textContent=routeLoading?'Processing…':'Calculate a route to list rest stations.'; return; }
+  sum.innerHTML=rz.zones.length
+    ? `${rz.zones.length} station${rz.zones.length>1?'s':''} within ${f2(rz.near_route_limit_m/1000)} km. Longest stretch without one: <b>${f2(rz.longest_gap_m/1000,2)} km</b> (route km ${f2(rz.longest_gap_from_km,2)}–${f2(rz.longest_gap_to_km,2)}).`
+    : `No rest station within ${f2(rz.near_route_limit_m/1000)} km of this route (${f2(rz.route_length_m/1000,2)} km without one).`;
+  rz.zones.forEach((z,i)=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<span class="km"><b class="znum">${i+1}</b> km ${f2(z.route_km,1)}</span><span>${z.id} · score ${f1(z.score)}</span><span class="meta">${f2(z.distance_to_route_m/1000,2)} km off route · slope ${f2(z.mean_slope_deg)}° · ${z.sunlit?'<span class="lit">sunlit '+f2(z.illumination,2)+'</span>':'<span class="shade">shaded</span>'}</span>`;
+    li.addEventListener('click',()=>{ const full=ZONES?.zones.find(x=>x.id===z.id)||z; flyTo(full.lon,full.lat); showZonePopup(full); });
+    list.append(li);
+  });
+}
+function baseSurfacePoint(){
+  const point=routeSurfacePoint(BASE.point), geo={lon:BASE.lon,lat:BASE.lat};
+  return geoVector(geo.lon,geo.lat,point.length());
+}
+function addBaseMarker(){
+  if(!BASE?.available) return;
+  const c=document.createElement('canvas'); c.width=128; c.height=128;
+  const g=c.getContext('2d');
+  // house-shaped icon (distinct from round A/B markers) with a "Base" label
+  g.fillStyle='#ffd27a'; g.strokeStyle='#111'; g.lineWidth=5;
+  g.beginPath(); g.moveTo(64,10); g.lineTo(108,46); g.lineTo(96,46); g.lineTo(96,84); g.lineTo(32,84); g.lineTo(32,46); g.lineTo(20,46); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle='#111'; g.fillRect(56,58,16,26);
+  g.font='700 30px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.lineWidth=6; g.strokeStyle='#111'; g.strokeText('Base',64,108); g.fillStyle='#ffd27a'; g.fillText('Base',64,108);
+  const texture=new THREE.CanvasTexture(c); texture.colorSpace=THREE.SRGBColorSpace;
+  // sizeAttenuation:false keeps the marker the same size on screen at every zoom level
+  const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,transparent:true,depthTest:true,depthWrite:false,sizeAttenuation:false}));
+  const position=baseSurfacePoint();
+  sprite.position.copy(position.clone().normalize().multiplyScalar(position.length()+0.0002));
+  sprite.center.set(0.5,0.15); sprite.scale.setScalar(0.075); sprite.renderOrder=5; sprite.name='base';
+  overlayGroup.add(sprite);
+}
+function baseScreenDistance(event){
+  if(!BASE?.available) return Infinity;
+  const rect=canvas.getBoundingClientRect(), p=baseSurfacePoint().project(camera);
+  if(p.z>1) return Infinity;
+  const x=(p.x+1)/2*rect.width+rect.left, y=(1-p.y)/2*rect.height+rect.top;
+  // the icon sits above its anchor point, so also accept clicks on the icon body
+  return Math.min(Math.hypot(event.clientX-x,event.clientY-y),Math.hypot(event.clientX-x,event.clientY-(y-0.05*rect.height)));
+}
+const fLat=v=>`${Math.abs(v).toFixed(5)}° ${v>=0?'N':'S'}`, fLon=v=>`${Math.abs(v).toFixed(5)}° ${v>=0?'E':'W'}`;
+function showPopup(html){ $('popupBody').innerHTML=html; $('popup').hidden=false; }
+function hidePopup(){ $('popup').hidden=true; }
+function showBasePopup(){
+  if(!BASE?.available) return;
+  showPopup(`<h4>Base camp</h4><div class="kv">
+    <div>Latitude</div><div class="v">${fLat(BASE.lat)}</div>
+    <div>Longitude</div><div class="v">${fLon(BASE.lon)}</div>
+    <div>Grid cell (row, col)</div><div class="v">${BASE.row}, ${BASE.col}</div>
+    <div>Elevation (MOLA datum)</div><div class="v">${fm(BASE.elevation_m)} m</div>
+    <div>Max slope in cell</div><div class="v">${f1(BASE.slope_max_deg)}°</div></div>
+    <div class="muted">${BASE.is_default
+      ?(BASE.adjusted?`Base moved ${fm(BASE.adjustment_m)} m from the map centre to the nearest passable cell. ${BASE.adjustment_reason||''}`:'Centre of the Jezero map (passable).')
+      :(BASE.adjusted?`Moved ${fm(BASE.adjustment_m)} m from the clicked point to the nearest passable cell: ${BASE.adjustment_reason}`:'Set by you for this session. Reset base returns it to the map centre.')}</div>`);
+}
 function drawOverlay(){
   while(overlayGroup.children.length){
     const item=overlayGroup.children.pop(); overlayGroup.remove(item);
@@ -487,40 +822,47 @@ function drawOverlay(){
     const material=new THREE.MeshBasicMaterial({color:safe.fallback?0xff705e:0x69d7e8});
     overlayGroup.add(new THREE.Mesh(geometry,material));
   }
-  if(A) addMarker(A,'A',0x7dff9b);
+  addZoneTiles();
+  if(A&&routeMode==='ab') addMarker(A,'A',0x7dff9b);
   if(B) addMarker(B,'B',0xff7a3d);
+  addBaseMarker();
 }
 
 loadGlobeTexture(); setCamera(1.026); resizeGlobe(); animateGlobe();
 
-/* ---------- grafikler ---------- */
+/* ---------- charts ---------- */
 function drawChart(cv,series,o){
   const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=200;
   cv.width=w*dpr; cv.height=h*dpr; const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
-  if(!series){ c.font='13px Space Grotesk, sans-serif'; c.fillStyle='#806e62'; c.textAlign='center'; c.fillText('Haritada iki nokta seçince burada görünür',w/2,h/2); cv._map=null; return; }
+  const th=themeColors();
+  if(!series){ c.font='13px Space Grotesk, sans-serif'; c.fillStyle=th.axis; c.textAlign='center'; c.fillText('Pick two points on the map to see this chart',w/2,h/2); cv._map=null; return; }
   const L=44, R=10, Tp=10, Bt=26, pw=w-L-R, ph=h-Tp-Bt;
   const X=v=>L+v/o.xMax*pw, Y=v=>Tp+ph-(v-o.yMin)/(o.yMax-o.yMin)*ph;
-  c.font='11px JetBrains Mono, monospace'; c.fillStyle='#806e62'; c.strokeStyle='#35261d'; c.lineWidth=1;
+  c.font='11px JetBrains Mono, monospace'; c.fillStyle=th.axis; c.strokeStyle=th.grid; c.lineWidth=1;
   for(let k=0;k<=4;k++){ const v=o.yMin+(o.yMax-o.yMin)*k/4, y=Y(v); c.beginPath(); c.moveTo(L,y); c.lineTo(w-R,y); c.stroke(); c.textAlign='right'; c.fillText(Math.round(v)+(o.unit||''),L-6,y+4); }
   const step=o.xMax>1400?400:o.xMax>700?200:o.xMax>300?100:50;
   c.textAlign='center'; for(let v=0;v<=o.xMax;v+=step) c.fillText(v+' m',X(v),h-8);
   if(o.limit!=null){
-    c.fillStyle='rgba(255,90,90,.08)'; c.fillRect(L,Tp,pw,Math.max(0,Y(o.limit)-Tp));
-    c.save(); c.setLineDash([6,5]); c.strokeStyle='#ff5a5a'; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,Y(o.limit)); c.lineTo(w-R,Y(o.limit)); c.stroke(); c.restore();
+    c.save(); c.globalAlpha=.08; c.fillStyle=th.danger; c.fillRect(L,Tp,pw,Math.max(0,Y(o.limit)-Tp)); c.restore();
+    c.save(); c.setLineDash([6,5]); c.strokeStyle=th.danger; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,Y(o.limit)); c.lineTo(w-R,Y(o.limit)); c.stroke(); c.restore();
   }
   for(const s of series){
     c.save(); if(s.dash) c.setLineDash(s.dash); c.strokeStyle=s.color; c.lineWidth=s.width||2; c.lineJoin='round';
     c.beginPath(); for(let k=0;k<s.xs.length;k++){ const x=X(s.xs[k]), y=Y(clamp(s.ys[k],o.yMin,o.yMax)); k?c.lineTo(x,y):c.moveTo(x,y); } c.stroke(); c.restore();
   }
-  if(o.hoverX!=null){ c.strokeStyle='rgba(255,255,255,.6)'; c.beginPath(); c.moveTo(X(o.hoverX),Tp); c.lineTo(X(o.hoverX),Tp+ph); c.stroke(); }
+  if(o.hoverX!=null){ c.strokeStyle=th.hover; c.beginPath(); c.moveTo(X(o.hoverX),Tp); c.lineTo(X(o.hoverX),Tp+ph); c.stroke(); }
   cv._map={L,pw,xMax:o.xMax};
+}
+function themeColors(){
+  const css=getComputedStyle(document.documentElement), v=name=>css.getPropertyValue(name).trim();
+  return {axis:v('--chart-axis'),grid:v('--chart-grid'),line:v('--chart-line'),hover:v('--chart-hover'),danger:v('--danger')};
 }
 function smooth(a,r){ const o=[]; for(let k=0;k<a.length;k++){ let s=0,n=0; for(let j=k-r;j<=k+r;j++) if(j>=0&&j<a.length){ s+=a[j]; n++; } o.push(s/n); } return o; }
 function drawCharts(){
   if(!safe){ drawChart($('chElev'),null); drawChart($('chSlope'),null); return; }
   const profile=safe.profile, xMax=Math.max(profile.distance_m.at(-1),10);
-  drawChart($('chElev'),[{xs:profile.distance_m,ys:profile.elevation_m,color:'#6fe3ff',width:2.4}],{xMax,yMin:Math.min(...profile.elevation_m),yMax:Math.max(...profile.elevation_m),hoverX});
-  drawChart($('chSlope'),[{xs:profile.distance_m,ys:profile.slope_deg,color:'#6fe3ff',width:2.4}],{xMax,yMin:0,yMax:Math.max(35,Math.ceil(safe.environment.max_slope_deg/5)*5),unit:'°',limit:P.limit,hoverX});
+  drawChart($('chElev'),[{xs:profile.distance_m,ys:profile.elevation_m,color:themeColors().line,width:2.4}],{xMax,yMin:Math.min(...profile.elevation_m),yMax:Math.max(...profile.elevation_m),hoverX});
+  drawChart($('chSlope'),[{xs:profile.distance_m,ys:profile.slope_deg,color:themeColors().line,width:2.4}],{xMax,yMin:0,yMax:Math.max(35,Math.ceil(safe.environment.max_slope_deg/5)*5),unit:'°',limit:P.limit,hoverX});
 }
 function chartHover(e){
   const cv=e.currentTarget, m=cv._map; if(!m||!safe) return;
@@ -528,41 +870,158 @@ function chartHover(e){
   hoverX=x;
   let k=safe.profile.distance_m.findIndex(v=>v>=x); if(k<0) k=safe.profile.distance_m.length-1;
   hoverPoint=safe.points[k];
-  $('readout').textContent=`Rota · ${Math.round(safe.profile.distance_m[k])} m: yükseklik ${f1(safe.profile.elevation_m[k])} m, eğim ${f1(safe.profile.slope_deg[k])}°`;
+  $('readout').textContent=`Route · ${fm(safe.profile.distance_m[k])} m: elevation ${f1(safe.profile.elevation_m[k])} m, slope ${f1(safe.profile.slope_deg[k])}°`;
   drawOverlay(); drawCharts();
 }
 function chartLeave(){ hoverX=null; hoverPoint=null; hoverMesh.visible=false; $('readout').textContent=''; drawCharts(); }
 ['chElev','chSlope'].forEach(id=>{ $(id).addEventListener('pointermove',chartHover); $(id).addEventListener('pointerleave',chartLeave); });
 
-/* ---------- rota özeti ---------- */
+/* ---------- route summary ---------- */
 function renderStats(){
   const stats=$('stats');
   if(!safe){
-    const status=routeLoading?'İşleniyor…':routeError==='No traversable route exists for these limits'?'Rota bulunamadı':routeError?'Hata':routeDirty?'Hesaplama bekliyor':'—';
-    stats.innerHTML='<div>Durum</div><div class="v">'+status+'</div>';
+    const status=routeLoading?'Processing…':routeError==='No traversable route exists for these limits'?'No route found':routeError?'Error':routeDirty?'Waiting to calculate':'—';
+    stats.innerHTML='<div>Status</div><div class="v">'+status+'</div>';
     return;
   }
   const env=safe.environment||{};
   stats.innerHTML=[
-    ...(safe.fallback?[['Rota türü','En düşük risk · uyarılı']]:[]),
-    ['Mesafe',fm(env.distance_m)+' m'],['Yüzey mesafesi',fm(env.surface_distance_m)+' m'],
-    ['En dik eğim',f1(env.max_slope_deg)+'°'],['Ort. eğim',f1(env.mean_slope_deg)+'°'],
-    ['Tırmanış',fm(env.ascent_m)+' m'],['İniş',fm(env.descent_m)+' m'],
-    ['HiRISE kapsamı',f1(env.hirise_cell_share_pct||0)+'%'],['Dijkstra hareketi',safe.optimality.gridMoves],
+    ...(safe.fallback?[['Route type','Least-risk fallback · warning']]:[]),
+    ['Distance',fm(env.distance_m)+' m'],['Surface distance',fm(env.surface_distance_m)+' m'],
+    ['Max slope',f1(env.max_slope_deg)+'°'],['Mean slope',f1(env.mean_slope_deg)+'°'],
+    ['Ascent',fm(env.ascent_m)+' m'],['Descent',fm(env.descent_m)+' m'],
+    ['HiRISE coverage',f1(env.hirise_cell_share_pct||0)+'%'],['Dijkstra moves',safe.optimality.gridMoves],
     ...weatherRows(env.weather)
   ].map(([label,value])=>`<div>${label}</div><div class="v">${value}</div>`).join('');
 }
 function weatherRows(w){
-  // NASA olcum verisi (MEDA, Mastcam-Z, Mars24): secilen yerel saatin ortanca degerleri, tahmin degil
-  if(!w||!w.available) return [['Hava','veri yok']];
+  // NASA measurements (MEDA, Mastcam-Z, Mars24): medians for the selected local hour, not a forecast
+  if(!w||!w.available) return [['Weather','no data']];
   const v=(x,u)=>Number.isFinite(x)?f1(x)+u:'—';
-  const rows=[[`Hava (${String(w.hour_ltst).padStart(2,'0')}:00 yerel)`,w.in_eva_window?'EVA penceresinde':'EVA penceresi dışında'],
-    ['Hava sıcaklığı',v(w.air_temp_c,' °C')],['Zemin sıcaklığı',v(w.ground_temp_c,' °C')],
-    ['Basınç',v(w.pressure_pa,' Pa')],['Rüzgâr (ortanca)',w.wind_m_s?v(w.wind_m_s.median,' m/s'):'—'],
-    ['Toz (optik derinlik)',w.dust_optical_depth?w.dust_optical_depth.median.toLocaleString('tr-TR',{maximumFractionDigits:2}):'—']];
-  if(w.sun) rows.push(['Güneş yüksekliği',Number.isFinite(w.sun.elevation_deg)?f1(w.sun.elevation_deg)+'°':(Number.isFinite(w.sun.min_deg)?f1(w.sun.min_deg)+'–'+f1(w.sun.max_deg)+'°':'—')]);
-  if(Number.isFinite(w.radiation_msv_per_day)) rows.push(['Radyasyon (Gale)',w.radiation_msv_per_day.toLocaleString('tr-TR')+' mSv/gün']);
+  const rows=[[`Weather (${String(w.hour_ltst).padStart(2,'0')}:00 local)`,w.in_eva_window?'Inside EVA window':'Outside EVA window'],
+    ['Air temperature',v(w.air_temp_c,' °C')],['Ground temperature',v(w.ground_temp_c,' °C')],
+    ['Pressure',v(w.pressure_pa,' Pa')],['Wind (median)',w.wind_m_s?v(w.wind_m_s.median,' m/s'):'—'],
+    ['Dust (optical depth)',w.dust_optical_depth?w.dust_optical_depth.median.toLocaleString('en-US',{maximumFractionDigits:2}):'—']];
+  if(w.sun) rows.push(['Sun elevation',Number.isFinite(w.sun.elevation_deg)?f1(w.sun.elevation_deg)+'°':(Number.isFinite(w.sun.min_deg)?f1(w.sun.min_deg)+'–'+f1(w.sun.max_deg)+'°':'—')]);
+  if(Number.isFinite(w.radiation_msv_per_day)) rows.push(['Radiation (Gale)',w.radiation_msv_per_day.toLocaleString('en-US')+' mSv/day']);
   return rows;
+}
+function travelSettingsFromInputs(){
+  const n=id=>{ const v=parseFloat(String($(id).value).replace(',','.')); return Number.isFinite(v)?v:undefined; };
+  return {start_hour:n('tStart')};
+}
+const f2=(v,d=2)=>v.toLocaleString('en-US',{maximumFractionDigits:d});
+function renderTravel(){
+  const box=$('travelStats'), warn=$('travelWarn'), info=$('travelInfo'), t=safe?.travel;
+  if(!t){ box.innerHTML='<div>Status</div><div class="v">'+(routeLoading?'Processing…':'Calculate a route')+'</div>'; warn.style.display='none'; info.hidden=true; return; }
+  const rows=[
+    ['sec','Rover'],['Distance',f2(t.drive_m/1000)+' km'],['Time',t.drive_time_hhmm+' h'],['Speed',f1(t.rover_speed_kmh)+' km/h · '+f1(t.rover_speed_m_per_min)+' m/min'],
+    ['sec','On foot'],['Distance',fm(t.walk_m)+' m'],['Time',t.walk_time_hhmm+' h'],['Speed',f1(t.walk_speed_kmh)+' km/h · '+f1(t.walk_speed_m_per_min)+' m/min'],
+    ['sec','Total'],['Total time',t.total_time_hhmm+' h'],['Start → arrival (LTST)',t.start_time_ltst+' → '+t.arrival_time_ltst+(t.arrival_sols_later?` (+${t.arrival_sols_later} sol)`:'')],
+    ['EVA window '+t.eva_window_ltst,t.arrival_in_eva_window?'<span class="good">Inside</span>':'<span class="bad">Outside</span>'],
+    ['Farthest point from base',t.farthest_from_base_m==null?'—':f2(t.farthest_from_base_m/1000)+' km'],
+    ['EVA radiation dose',t.eva_dose_msv==null?'no data':f2(t.eva_dose_msv,3)+' mSv'],
+    ['Share of 600 mSv career limit',t.eva_dose_pct_of_career_limit==null?'—':f2(t.eva_dose_pct_of_career_limit,4)+'%']
+  ];
+  box.innerHTML=rows.map(([a,b])=>a==='sec'?`<div class="sec">${b}</div>`:`<div>${a}</div><div class="v">${b}</div>`).join('')+
+    '<div class="sec" style="font-weight:400;text-transform:none;letter-spacing:0">Dose uses the site-wide Curiosity RAD value from Gale crater (0.64 mSv/day); career limit per NASA-STD-3001.</div>';
+  warn.style.display=t.arrival_in_eva_window?'none':'block';
+  warn.textContent=t.arrival_in_eva_window?'':`Arrival is outside the EVA window (${t.eva_window_ltst} LTST).`;
+  info.hidden=!t.beyond_walkback_limit;
+  info.textContent=t.beyond_walkback_limit?`Beyond ${f1(t.walkback_limit_m/1000)} km walk-back limit if the rover fails (farthest point ${f2(t.farthest_from_base_m/1000)} km from base).`:'';
+}
+let travelTimer=null, travelRequestId=0;
+function onTravelInput(){
+  clearTimeout(travelTimer);
+  travelTimer=setTimeout(async()=>{
+    if(!safe?.travel) return;
+    const id=++travelRequestId;
+    try{
+      const response=await fetch('/travel',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({route_length_m:safe.travel.route_length_m,farthest_from_base_m:safe.travel.farthest_from_base_m,settings:travelSettingsFromInputs()})});
+      if(!response.ok) return;
+      const travel=await response.json();
+      if(id===travelRequestId&&safe){ safe.travel=travel; renderTravel(); }
+    }catch(error){}
+  },250);
+}
+const esc=v=>String(v).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function mdVal(v,unit='',d=1){ return Number.isFinite(v)?`${f2(v,d)}${unit}`:'<span class="nd">no data</span>'; }
+function mdRange(a,b,unit='',d=1){ return Number.isFinite(a)&&Number.isFinite(b)?`${f2(a,d)}–${f2(b,d)}${unit}`:'<span class="nd">no data</span>'; }
+function mdSection(title,source,rows,{siteWide=false,note=null,extra='',open=true}={}){
+  return `<details${open?' open':''}><summary>${title}${siteWide?' <span class="badge sw">site-wide</span>':''}</summary>
+    <div class="src">Source: ${esc(source||'no data')}</div>
+    ${rows.length?`<div class="rows">${rows.map(([l,v])=>`<div>${l}</div><div class="v">${v}</div>`).join('')}</div>`:''}
+    ${extra}${note?`<div class="note">${esc(note)}</div>`:''}</details>`;
+}
+function renderMission(){
+  const box=$('missionBody'), M=MISSION;
+  if(!M){ box.innerHTML=`<div class="note">${missionLoaded?'Mission data unavailable.':'Loading…'}</div>`; return; }
+  const env=safe?.environment, opt=safe?.optimality, t=safe?.travel, rz=safe?.restZones, P=safe?.perseverance, alt=safe?.risk?.shortestAlternative;
+  const nd='<span class="nd">no data</span>';
+  const html=[];
+  html.push(mdSection('Route','Route engine (HiRISE 1 m / CTX 20 m terrain)',safe?[
+    ['Length',mdVal(env?.distance_m,' m',0)],['Surface distance',mdVal(env?.surface_distance_m,' m',0)],
+    ['Max slope',mdVal(env?.max_slope_deg,'°')],['Mean slope',mdVal(env?.mean_slope_deg,'°')],
+    ['Ascent',mdVal(env?.ascent_m,' m',0)],['Descent',mdVal(env?.descent_m,' m',0)],
+    ['Route mode',opt?(opt.startIsBase?'Base → B':'A → B'):nd],
+    ['Shortest alternative',alt?`${alt.distanceDifferenceFromChosen_m>0?'+':''}${f2(alt.distanceDifferenceFromChosen_m,0)} m vs chosen`:(safe?'same route':nd)]
+  ]:[['Route','<span class="nd">calculate a route</span>']]));
+  html.push(mdSection('Travel','Apollo LRV, NASA walk-back study',t?[
+    ['Rover distance',mdVal(t.drive_m/1000,' km',2)],['Walking distance',mdVal(t.walk_m,' m',0)],
+    ['Rover time',t.drive_time_hhmm?t.drive_time_hhmm+' h':nd],['Walking time',t.walk_time_hhmm?t.walk_time_hhmm+' h':nd],
+    ['Total time',t.total_time_hhmm?t.total_time_hhmm+' h':nd],['Arrival (LTST)',t.arrival_time_ltst||nd],
+    ['EVA window '+(t.eva_window_ltst||''),t.arrival_in_eva_window?'<span class="good">inside</span>':'<span class="bad">outside</span>'],
+    ['Walk-back ('+f1(t.walkback_limit_m/1000)+' km)',t.farthest_from_base_m==null?'<span class="nd">no base set</span>':(t.beyond_walkback_limit?'<span class="bad">beyond limit</span>':'<span class="good">within limit</span>')]
+  ]:[['Travel','<span class="nd">calculate a route</span>']]));
+  const T_=M.temperature;
+  html.push(mdSection('Temperature',T_.source,[
+    ['Air, median',T_.air?`${mdVal(T_.air.median_c,' °C')} · ${mdVal(T_.air.median_k,' K')}`:nd],
+    ['Air, p10–p90',T_.air?`${mdRange(T_.air.p10_c,T_.air.p90_c,' °C')} · ${mdRange(T_.air.p10_k,T_.air.p90_k,' K')}`:nd],
+    ['Ground, median',T_.ground?`${mdVal(T_.ground.median_c,' °C')} · ${mdVal(T_.ground.median_k,' K')}`:nd],
+    ['Ground, p10–p90',T_.ground?`${mdRange(T_.ground.p10_c,T_.ground.p90_c,' °C')} · ${mdRange(T_.ground.p10_k,T_.ground.p90_k,' K')}`:nd]
+  ],{siteWide:true}));
+  html.push(mdSection('Pressure',M.pressure.source,[['Median',mdVal(M.pressure.median_pa,' Pa')],['p10–p90',mdRange(M.pressure.p10_pa,M.pressure.p90_pa,' Pa')]],{siteWide:true,note:M.pressure.note}));
+  html.push(mdSection('Wind',M.wind.source,[['Median',mdVal(M.wind.median_m_s,' m/s',2)],['p90',mdVal(M.wind.p90_m_s,' m/s',2)]],{siteWide:true,note:M.wind.note}));
+  html.push(mdSection('Humidity',M.humidity.source,[['Relative humidity, median',mdVal(M.humidity.median_pct,' %',2)],['p90',mdVal(M.humidity.p90_pct,' %',2)]],{siteWide:true,note:M.humidity.note}));
+  html.push(mdSection('Dust',M.dust.source+(M.dust.license?' · '+M.dust.license:''),[['Scope',esc(M.dust.scope)],['Optical depth τ, median',mdVal(M.dust.median_tau,'',3)],['τ p90',mdVal(M.dust.p90_tau,'',3)]],{siteWide:true}));
+  html.push(mdSection('UV',M.uv.source,[['250–400 nm, median',mdVal(M.uv.median_w_m2,' W/m²',3)],['p90',mdVal(M.uv.p90_w_m2,' W/m²',3)]],{siteWide:true,note:M.uv.note}));
+  const S=M.sun;
+  html.push(mdSection('Sun',S.source,[
+    ['Elevation at '+String(S.hour_ltst).padStart(2,'0')+':00 ('+esc(S.season)+')',Number.isFinite(S.elevation_deg)?mdVal(S.elevation_deg,'°'):(S.elevation_range_deg?mdRange(S.elevation_range_deg.min_deg,S.elevation_range_deg.max_deg,'°')+' (all seasons)':nd)],
+    ['Measured geometry (MEDA)',S.measured_range_deg?mdRange(S.measured_range_deg.min_deg,S.measured_range_deg.max_deg,'°')+` (${S.measured_range_deg.sols} sols)`:nd],
+    ['Lowest in EVA window '+(S.eva_window_ltst||''),mdVal(S.eva_min_elevation_deg,'°')]
+  ]));
+  const R=M.radiation;
+  html.push(mdSection('Radiation',R.source,[
+    ['Dose rate',Number.isFinite(R.mgy_per_day)?`${f2(R.mgy_per_day,2)} ± ${f2(R.mgy_uncertainty,2)} mGy/day`:nd],
+    ['Dose equivalent',Number.isFinite(R.msv_per_day)?`${f2(R.msv_per_day,2)} ± ${f2(R.msv_uncertainty,2)} mSv/day`:nd],
+    ['This EVA',t&&Number.isFinite(t.eva_dose_msv)?mdVal(t.eva_dose_msv,' mSv',3):'<span class="nd">calculate a route</span>'],
+    ['Share of 600 mSv career limit',t&&Number.isFinite(t.eva_dose_pct_of_career_limit)?mdVal(t.eva_dose_pct_of_career_limit,' %',4):'<span class="nd">calculate a route</span>']
+  ],{siteWide:true,note:R.note+(R.measured_at?' ('+R.measured_at+')':'')}));
+  html.push(mdSection('Rest stations','Route engine',rz?[
+    ['Stations within '+f2(rz.near_route_limit_m/1000)+' km',String(rz.zones.length)],
+    ['Longest stretch without one',mdVal(rz.longest_gap_m/1000,' km',2)]
+  ]:[['Rest stations','<span class="nd">calculate a route</span>']]));
+  html.push(mdSection('Perseverance','NASA Raw Images',P?.available?[
+    ['Nearest waypoint',`sol ${P.sol} (site ${P.site}, drive ${P.drive})`],['Distance to route',mdVal(P.distance_m/1000,' km',2)]
+  ]:[['Nearest waypoint',safe?nd:'<span class="nd">calculate a route</span>']],{extra:P?.available&&P.image?.url_small?`<img src="${esc(P.image.url_small)}" alt="Perseverance ${esc(P.image.instrument||'')} image, sol ${P.sol}" loading="lazy"><div class="note">Image: ${esc(P.image.credit||'NASA')} · ${esc(P.image.instrument||'')} · sol ${P.sol}</div>`:''}));
+  html.push(mdSection('Sources','data/kaynaklar_v3.json',[],{open:false,extra:`<ul>${(M.sources||[]).map(x=>`<li>${esc(x.title)} — <span class="${x.license?'':'nd'}">${esc(x.license||'license: no data')}</span></li>`).join('')}</ul>`}));
+  box.innerHTML=html.join('');
+}
+async function loadMissionData(){
+  try{
+    const r=await fetch('/mission-data?hour='+sunHour+(seasonLs==='all'?'':'&ls='+seasonLs));
+    MISSION=r.ok?await r.json():null;
+  }catch(error){ MISSION=null; }
+  missionLoaded=true;
+  renderMission();
+}
+function setHourSeason(hour,ls){
+  sunHour=hour; seasonLs=ls;
+  $('sunHour').value=String(hour); $('mdHour').value=String(hour); $('mdLs').value=String(ls);
+  hidePopup(); loadRestZones(); loadMissionData();
+  if(safe){ routeDirty=true; renderGuide(); }
 }
 function renderReasons(){
   const list=$('reasons');
@@ -570,17 +1029,17 @@ function renderReasons(){
   if(routeError||!A||!B||routeLoading||routeDirty||!safe){
     const item=document.createElement('li');
     item.textContent=routeError==='No traversable route exists for these limits'
-      ? 'Bu eğim ve kaya sınırlarıyla A ile B arasında geçilebilir rota bulunamadı. Eğim sınırını artırmayı veya noktaları taşımayı deneyin.'
-      : routeError||(!A?'Haritada başlangıç noktasını (A) seç.':!B?'Şimdi varış noktasını (B) seç.':routeLoading?'Rota hesaplanıyor…':routeDirty?'Hesaplamayı başlatmak için Hesapla düğmesine bas.':'Bu ayarlarla geçilebilir rota bulunamadı.');
+      ? 'No passable route between A and B with these slope and rock limits. Try raising the slope limit or moving the points.'
+      : routeError||(!A?'Pick the start point (A) on the map.':!B?'Now pick the destination (B).':routeLoading?'Calculating route…':routeDirty?'Press Calculate to start.':'No passable route found with these settings.');
     list.append(item);
   }else{
     if(safe.fallback){
       const warning=document.createElement('li');
-      warning.textContent=safe.routeWarning||'Tamamen geçilebilir rota bulunamadı; bu, mevcut seçenekler içindeki en düşük riskli alternatiftir.';
+      warning.textContent=safe.routeWarning||'No fully passable route was found; this is the least-risk fallback among the available options and it crosses hazardous terrain.';
       list.append(warning);
     }
     const why=document.createElement('li');
-    why.textContent=safe.why||'AI rota açıklaması alınamadı.';
+    why.textContent=safe.why||'AI route explanation unavailable.';
     list.append(why);
     for(const factor of safe.factors||[]){
       const item=document.createElement('li');
@@ -589,35 +1048,42 @@ function renderReasons(){
     }
     if(safe.navigation){
       const item=document.createElement('li');
-      item.textContent=`Navigasyon: ${safe.navigation}`;
+      item.textContent=`Navigation: ${safe.navigation}`;
       list.append(item);
     }
   }
   const warning=$('warn');
   warning.style.display=routeError||safe?.fallback?'block':'none';
-  warning.textContent=routeError||(safe?.fallback?'Tamamen güvenli rota yok. Kırmızı çizgi, en düşük riskli fakat tehlikeli geçişi gösterir.':'');
+  warning.textContent=routeError||(safe?.fallback?'No fully safe route. The red line shows the least-risk fallback, which still crosses hazardous terrain.':'');
 }
 function renderGuide(){
   const g=$('guide');
-  if(!A) g.innerHTML='<b>Başlangıç:</b> Haritada konuma gelin; A\'yı koy düğmesine basın veya A tuşunu kullanın.';
-  else if(!B) g.innerHTML='<b>Varış:</b> Yeni konuma gelin; B\'yi koy düğmesine basın veya B tuşunu kullanın.';
-  else if(!terrainReady) g.innerHTML='<b>Arazi yükleniyor.</b> Gerçek pathing terrain verisi bekleniyor…';
-  else if(routeLoading) g.innerHTML='<b>Rota hesaplanıyor.</b> AI rota özeti hazırlanıyor…';
-  else if(routeError==='No traversable route exists for these limits') g.innerHTML='<b>Bu sınırlarla rota bulunamadı.</b> Eğim limitini artırın veya A/B noktalarını değiştirin.';
-  else if(routeError) g.innerHTML='<b>Rota alınamadı.</b> Harita ayarlarını veya backend durumunu kontrol et.';
-  else if(safe?.fallback) g.innerHTML='<b>Uyarılı alternatif rota.</b> Tamamen güvenli geçiş bulunamadı; kırmızı çizgi en düşük riskli seçeneği gösteriyor.';
-  else if(routeDirty) g.innerHTML='<b>Rota hazır.</b> Hesaplamayı başlatmak için Hesapla düğmesine bas.';
-  else if(example) g.innerHTML='<b>Örnek rota.</b> Kendi rotan için haritada iki noktaya tıkla.';
-  else if(safe) g.innerHTML='<b>Rota hazır.</b> AI rota özeti ve navigasyon önerisi hazır.';
-  else g.innerHTML='<b>Rota bulunamadı.</b> Ayarları değiştirip yeniden deneyebilirsin.';
-  $('swap').disabled=!(A&&B); $('clear').disabled=!A; $('cRoute').disabled=!safe;
-  $('setA').disabled=!selectionPoint; $('setB').disabled=!selectionPoint;
-  $('calculate').disabled=!(A&&B)||routeLoading||!terrainReady;
-  $('calculate').textContent=routeLoading?'Hesaplanıyor…':routeDirty?'Hesapla':'Yeniden hesapla';
+  if(pickingBase) g.innerHTML='<b>Set base:</b> Click the map or globe to place the base camp. Unsafe points move to the nearest passable cell.';
+  else if(routeMode==='base'&&!BASE?.available) g.innerHTML='<b>Set a base first.</b> Press Set base and click the map, or switch to A → B mode.';
+  else if(routeMode==='base'&&!B) g.innerHTML='<b>Base → B:</b> The route starts at the base camp. Click the map or press Set B to pick the destination.';
+  else if(!A) g.innerHTML='<b>Start:</b> Point at a location on the map; press Set A or the A key.';
+  else if(!B) g.innerHTML='<b>Destination:</b> Point at a new location; press Set B or the B key.';
+  else if(!terrainReady) g.innerHTML='<b>Loading terrain.</b> Waiting for real pathing terrain data…';
+  else if(routeLoading) g.innerHTML='<b>Calculating route.</b> Preparing AI route summary…';
+  else if(routeError==='No traversable route exists for these limits') g.innerHTML='<b>No route found with these limits.</b> Raise the slope limit or move points A/B.';
+  else if(safe&&routeError) g.innerHTML='<b>Route ready.</b> AI route summary unavailable (language model not connected); all measured values are shown.';
+  else if(routeError) g.innerHTML='<b>Route unavailable.</b> Check the map settings or the backend status.';
+  else if(safe?.fallback) g.innerHTML='<b>Least-risk fallback route.</b> No fully safe crossing was found; the red line shows the least-risk option, which crosses hazardous terrain.';
+  else if(routeDirty) g.innerHTML='<b>Points set.</b> Press Calculate to start.';
+  else if(example) g.innerHTML='<b>Example route.</b> Click two points on the map for your own route.';
+  else if(safe) g.innerHTML='<b>Route ready.</b> AI route summary and navigation advice are ready.';
+  else g.innerHTML='<b>No route found.</b> Change the settings and try again.';
+  $('swap').disabled=!(A&&B)||routeMode==='base'; $('clear').disabled=routeMode==='base'?!B:!A; $('cRoute').disabled=!safe;
+  $('setA').disabled=!selectionPoint||routeMode==='base'; $('setB').disabled=!selectionPoint;
+  const needBase=routeMode==='base'&&!BASE?.available;
+  $('calculate').disabled=needBase||!(A&&B)||routeLoading||!terrainReady;
+  $('calculate').textContent=needBase?'Set a base first':routeLoading?'Calculating…':routeDirty?'Calculate':'Recalculate';
+  $('setBase').setAttribute('aria-pressed',String(pickingBase)); $('setBase').textContent=pickingBase?'Click the map…':'Set base';
+  $('resetBase').disabled=!DEFAULT_BASE||BASE===DEFAULT_BASE;
 }
 
 /* ---------- route request ---------- */
-function updateAll(){ drawOverlay(); drawCharts(); renderStats(); renderReasons(); renderGuide(); }
+function updateAll(){ drawOverlay(); drawCharts(); renderStats(); renderTravel(); renderRestList(); renderMission(); renderReasons(); renderGuide(); }
 let routeRequestId=0;
 let routeDirty=true;
 function invalidateRoute(){
@@ -639,28 +1105,61 @@ async function requestRoute(){
   try{
     const response=await fetch('/route',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({start:A,end:B})
+      body:JSON.stringify({...(routeMode==='base'?{startBase:true,end:B}:{start:A,end:B}),base:BASE?.available?{lon:BASE.lon,lat:BASE.lat}:null,travel:travelSettingsFromInputs(),hour:sunHour,ls:seasonLs==='all'?null:Number(seasonLs)})
     });
     const data=await response.json();
-    if(!response.ok) throw new Error(data.error||'Rota isteği başarısız oldu.');
+    if(!response.ok) throw new Error(data.error||'Route request failed.');
     if(requestId!==routeRequestId) return;
     if(data.route.length){
-      safe={points:data.route,profile:data.profile,optimality:data.optimality,environment:data.environment,why:data.narration?.why||'AI rota açıklaması alınamadı.',factors:data.narration?.factors||[],navigation:data.narration?.navigation||'',fallback:!!data.fallback,routeWarning:data.routeWarning};
+      safe={points:data.route,profile:data.profile,optimality:data.optimality,environment:data.environment,why:data.narration?.why||'AI route explanation unavailable.',factors:data.narration?.factors||[],navigation:data.narration?.navigation||'',fallback:!!data.fallback,routeWarning:data.routeWarning,travel:data.travel,restZones:data.restZones,risk:data.risk,perseverance:data.perseverance};
       routeLoading=false;
       updateAll();
-      if(data.narrationError) routeError=`Rota hesaplandı; AI özeti alınamadı: ${data.narrationError}`;
+      if(data.narrationError) routeError=`Route calculated; AI summary unavailable: ${data.narrationError}`;
     }
   }catch(error){
-    if(requestId===routeRequestId) routeError=error.message||'AI servisine ulaşılamadı.';
+    if(requestId===routeRequestId) routeError=error.message||'Could not reach the AI service.';
   }finally{
     if(requestId===routeRequestId){ routeLoading=false; updateAll(); }
   }
+}
+async function placeBase(lon,lat){
+  try{
+    const response=await fetch('/base',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({lon,lat})});
+    const data=await response.json();
+    return response.ok&&data.available?data:null;
+  }catch(error){ return null; }
+}
+// The base starts at the centre of the Jezero map every time the page opens (computed by the server from the
+// map bounds). "Set base" moves it for this session only; nothing is saved, so a reload returns it to the centre.
+try{ localStorage.removeItem('base'); }catch(error){} // clear the old saved base from earlier versions
+function useBase(base){
+  BASE=base;
+  if(routeMode==='base'){ A=BASE?{...BASE.point}:null; if(A&&B&&A.x===B.x&&A.y===B.y) B=null; }
+}
+async function loadBase(){
+  try{
+    const response=await fetch('/base/default');
+    const data=await response.json();
+    DEFAULT_BASE=response.ok&&data.available?data:null;
+  }catch(error){ DEFAULT_BASE=null; }
+  useBase(DEFAULT_BASE);
+}
+async function setBaseAt(lon,lat){
+  pickingBase=false;
+  const base=await placeBase(lon,lat);
+  if(base){ useBase(base); invalidateRoute(); loadRestZones(); showBasePopup(); }
+  else { renderGuide(); showPopup('<h4>Base not moved</h4><div class="muted">No passable cell near that point. Try another location.</div>'); }
+}
+async function resetBase(){
+  pickingBase=false;
+  if(!DEFAULT_BASE) await loadBase(); else useBase(DEFAULT_BASE);
+  invalidateRoute(); loadRestZones(); showBasePopup();
 }
 async function loadRealTerrain(){
   terrainReady=false; updateAll();
   try{
     const response=await fetch('/terrain');
-    if(!response.ok) throw new Error('Gerçek arazi verisi yüklenemedi.');
+    if(!response.ok) throw new Error('Could not load real terrain data.');
       const data=await response.json();
       T.bounds=data.bounds;
       const elevation=data.elevation.flat(), slope=data.slope.flat();
@@ -678,13 +1177,16 @@ async function loadRealTerrain(){
     T.dataSource=data.source;
     terrainReady=true;
     renderTerrainTexture(); buildTerrainMesh(); drawOverlay();
+    await loadBase();
+    if(rangeMode==='jezero') setCamera(1.026);
+    await loadRestZones();
     invalidateRoute();
   }catch(error){
-    routeError=error.message||'Gerçek arazi verisi yüklenemedi.';
+    routeError=error.message||'Could not load real terrain data.';
     updateAll();
   }
 }
-/* ---------- etkileşim ---------- */
+/* ---------- interaction ---------- */
 const tip=$('tip'), mb=$('mapbox');
 canvas.addEventListener('pointerenter',()=>canvas.focus({preventScroll:true}));
 function hitTerrain(event){
@@ -713,13 +1215,14 @@ function nearMarker(point){
 function updateHover(hit,event){
   const point=hit?hitToPoint(hit):null;
   hoverPoint=point;
+  canvas.style.cursor=pickingBase?'crosshair':baseScreenDistance(event)<22?'pointer':'';
   if(point) selectionPoint={x:point.x,y:point.y};
   if(point){const geo=pointToGeo(point);hoverMesh.position.copy(geoVector(geo.lon,geo.lat,1.0008));hoverMesh.visible=true;}
   else hoverMesh.visible=false;
   if(!point){tip.style.display='none';return;}
   const rx=Math.round(point.x/(W-1)*(T.renderWidth-1)),ry=Math.round(point.y/(H-1)*(T.renderHeight-1));
   const index=ry*T.renderWidth+rx,slope=T.renderSlope[index],elevation=T.renderH[index],bad=slope>P.limit;
-  tip.innerHTML=`göreli yükseklik ${f1(elevation)} m<br>eğim <b style="color:${bad?'#ff7b7b':'#6fe3ff'}">${f1(slope)}°</b>${bad?'<br><b style="color:#ff7b7b">20° sınırının üstü</b>':''}`;
+  tip.innerHTML=`relative elevation ${f1(elevation)} m<br>slope <b style="color:${bad?'var(--danger)':'var(--safe)'}">${f1(slope)}°</b>${bad?'<br><b style="color:var(--danger)">above the 20° limit</b>':''}`;
   const rect=mb.getBoundingClientRect();let left=event.clientX-rect.left+12,top=event.clientY-rect.top+12;
   if(left>rect.width-155)left-=170;if(top>rect.height-75)top-=85;
   tip.style.left=left+'px';tip.style.top=top+'px';tip.style.display=event.pointerType==='touch'?'none':'block';
@@ -729,6 +1232,7 @@ canvas.addEventListener('pointerdown',event=>{
   const hit=hitTerrain(event),point=hit&&hitToPoint(hit);
   press={x:event.clientX,y:event.clientY,moved:false,point};
   drag=point?nearMarker(point):null;
+  if(drag==='A'&&routeMode==='base') drag=null;
   if(drag) controls.enabled=false;
   tip.style.display='none';
 });
@@ -747,13 +1251,23 @@ function endGlobePointer(event){
   press=null;drag=null;controls.enabled=true;
   if(dragged){if(moved)invalidateRoute();return;}
   if(moved||event.type==='pointercancel')return;
+  if(pickingBase){
+    const hit=hitTerrain(event), p=hit?.point?.clone().normalize();
+    if(p) setBaseAt(Math.atan2(p.x,p.z)*DEG,Math.asin(clamp(p.y,-1,1))*DEG);
+    return;
+  }
+  if(baseScreenDistance(event)<22){ showBasePopup(); return; }
   const point=selectedPoint;
   if(!point)return;
-  if(!A||B){setRoutePoint('A',point);}
+  const zone=zoneAtScreen(event);
+  if(zone){ showZonePopup(zone); return; }
+  if(routeMode==='base') setRoutePoint('B',point);
+  else if(!A||B){setRoutePoint('A',point);}
   else setRoutePoint('B',point);
 }
 function setRoutePoint(label,point){
   if(!point)return;
+  if(routeMode==='base') label='B';
   const selected={x:point.x,y:point.y};
   if(label==='A'){
     A=selected;
@@ -789,7 +1303,35 @@ document.querySelectorAll('#range button').forEach(button=>button.addEventListen
 $('swap').addEventListener('click',()=>{ if(A&&B){ [A,B]=[B,A]; invalidateRoute(); } });
 $('setA').addEventListener('click',()=>setRoutePoint('A',selectionPoint));
 $('setB').addEventListener('click',()=>setRoutePoint('B',selectionPoint));
-$('clear').addEventListener('click',()=>{ A=B=null; example=false; invalidateRoute(); });
+$('clear').addEventListener('click',()=>{ B=null; if(routeMode==='ab') A=null; example=false; invalidateRoute(); });
+document.querySelectorAll('#mode button').forEach(button=>button.addEventListener('click',()=>{
+  if(button.dataset.mode===routeMode) return;
+  document.querySelectorAll('#mode button').forEach(item=>item.classList.toggle('on',item===button));
+  routeMode=button.dataset.mode;
+  A=routeMode==='base'&&BASE?.available?{...BASE.point}:null;
+  if(A&&B&&A.x===B.x&&A.y===B.y) B=null;
+  example=false; invalidateRoute();
+}));
+$('popupClose').addEventListener('click',hidePopup);
+$('setBase').addEventListener('click',()=>{ pickingBase=!pickingBase; hidePopup(); renderGuide(); });
+$('resetBase').addEventListener('click',resetBase);
+for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+':00'; if(h===sunHour) o.selected=true; $('sunHour').append(o); }
+$('sunHour').addEventListener('change',()=>setHourSeason(Number($('sunHour').value),seasonLs));
+for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+':00'; if(h===sunHour) o.selected=true; $('mdHour').append(o); }
+$('mdHour').addEventListener('change',()=>setHourSeason(Number($('mdHour').value),seasonLs));
+$('mdLs').addEventListener('change',()=>setHourSeason(sunHour,$('mdLs').value));
+loadMissionData();
+$('zonesToggle').addEventListener('change',()=>{ showZones=$('zonesToggle').checked; hidePopup(); drawOverlay(); renderLegend(); });
+$('tStart').addEventListener('input',onTravelInput);
+async function loadTravelParameters(){
+  try{
+    const p=await (await fetch('/travel-parameters')).json(), L=p.locked;
+    $('tRover').textContent=f1(L.rover_kmh)+' km/h'; $('tWalk').textContent=f1(L.walk_kmh)+' km/h';
+    $('tWalkM').textContent=fm(L.walk_m)+' m'; $('tLimit').textContent=f1(L.walkback_limit_m/1000)+' km';
+  }catch(error){ ['tRover','tWalk','tWalkM','tLimit'].forEach(id=>$(id).textContent='no data'); }
+}
+loadTravelParameters();
+document.addEventListener('keydown',event=>{ if(event.key==='Escape'){ hidePopup(); if(pickingBase){ pickingBase=false; renderGuide(); } } });
 $('calculate').addEventListener('click',()=>{
   if(!(A&&B)||routeLoading) return;
   requestRoute();
@@ -797,22 +1339,36 @@ $('calculate').addEventListener('click',()=>{
 
 window.addEventListener('resize',()=>{resizeGlobe();drawCharts();});
 
-/* ---------- durma mesafesi hesaplayıcı ---------- */
-const BODIES=[['Mars',3.72,'#ff7a3d'],['Dünya',9.81,'#6fe3ff'],['Ay',1.62,'#d9d2c8']];
-const fD=d=>d<1?f1(d*100)+' cm':(d<1000?f1(d)+' m':(d/1000).toLocaleString('tr-TR',{maximumFractionDigits:2})+' km');
+/* ---------- theme ---------- */
+function applyTheme(theme){
+  if(theme==='light') document.documentElement.dataset.theme='light'; else delete document.documentElement.dataset.theme;
+  $('themeToggle').textContent=theme==='light'?'Dark':'Light';
+  $('themeToggle').setAttribute('aria-pressed',theme==='light'?'true':'false');
+  drawCharts(); calc();
+}
+$('themeToggle').addEventListener('click',()=>{
+  const next=document.documentElement.dataset.theme==='light'?'dark':'light';
+  try{ localStorage.setItem('theme',next); }catch(e){}
+  applyTheme(next);
+});
+$('themeToggle').textContent=document.documentElement.dataset.theme==='light'?'Dark':'Light';
+
+/* ---------- stopping distance calculator ---------- */
+const BODIES=[['Mars',3.72,'#ff7a3d'],['Earth',9.81,'#6fe3ff'],['Moon',1.62,'#a89f95']];
+const fD=d=>d<1?f1(d*100)+' cm':(d<1000?f1(d)+' m':(d/1000).toLocaleString('en-US',{maximumFractionDigits:2})+' km');
 function calc(){
   const v=+$('cV').value, deg=+$('cT').value, th=deg/DEG, mu=+$('cMu').value, up=$('cDir').value==='up';
-  $('cVv').textContent=f1(v)+' m/s · '+fm(v*3.6)+' km/sa'; $('cTv').textContent=f1(deg)+'°'; $('cMuv').textContent=mu.toLocaleString('tr-TR',{minimumFractionDigits:2});
+  $('cVv').textContent=f1(v)+' m/s · '+fm(v*3.6)+' km/h'; $('cTv').textContent=f1(deg)+'°'; $('cMuv').textContent=mu.toLocaleString('en-US',{minimumFractionDigits:2});
   const k=up?Math.sin(th)+mu*Math.cos(th):mu*Math.cos(th)-Math.sin(th);
   $('cFormula').textContent=up?'d = v₀² / (2·g·(sinθ + μ·cosθ))':'d = v₀² / (2·g·(μ·cosθ − sinθ))';
   if(k<=1e-6){
     $('cBars').innerHTML='';
-    $('cOut').innerHTML='<b style="color:var(--danger)">Araç duramaz.</b> Bu eğimde tanθ ≥ μ olduğu için sürtünme aracı tutamaz; araç frenlese bile hızlanarak kayar. Bu sonuç yer çekiminden bağımsızdır: Mars\'ta da Dünya\'da da aynıdır.';
+    $('cOut').innerHTML='<b style="color:var(--danger)">The vehicle cannot stop.</b> On this slope tanθ ≥ μ, so friction cannot hold the vehicle; it slides and speeds up even while braking. This does not depend on gravity: it is the same on Mars and on Earth.';
     return;
   }
   const res=BODIES.map(b=>({n:b[0],g:b[1],c:b[2],d:v*v/(2*b[1]*k)})), mx=Math.max(...res.map(r=>r.d));
-  $('cBars').innerHTML=res.map(r=>`<div class="bar"><div class="top"><span>${r.n} <span style="color:var(--dim)">(g = ${r.g.toLocaleString('tr-TR')} m/s²)</span></span><b>${fD(r.d)}</b></div><div class="track"><div class="fill" style="width:${Math.max(1.5,r.d/mx*100)}%;background:${r.c}"></div></div></div>`).join('');
-  $('cOut').innerHTML='Araç Mars\'ta Dünya\'dakinin <b style="color:var(--text)">'+f1(res[0].d/res[1].d)+' katı</b> yol alır. Bu oran yalnızca g değerlerinin oranına bağlıdır; hız, eğim ve sürtünme değişse de aynı kalır.';
+  $('cBars').innerHTML=res.map(r=>`<div class="bar"><div class="top"><span>${r.n} <span style="color:var(--dim)">(g = ${r.g.toLocaleString('en-US')} m/s²)</span></span><b>${fD(r.d)}</b></div><div class="track"><div class="fill" style="width:${Math.max(1.5,r.d/mx*100)}%;background:${r.c}"></div></div></div>`).join('');
+  $('cOut').innerHTML='On Mars the vehicle travels <b style="color:var(--text)">'+f1(res[0].d/res[1].d)+' times</b> as far as on Earth. This ratio depends only on the ratio of g values; it stays the same when speed, slope or friction change.';
 }
 ['cV','cT','cMu','cDir'].forEach(id=>$(id).addEventListener('input',calc));
  $('cRoute').addEventListener('click',()=>{ if(safe){ $('cT').value=Math.min(40,Math.round(safe.environment.max_slope_deg*2)/2); calc(); } });

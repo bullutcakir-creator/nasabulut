@@ -2,6 +2,9 @@ const express = require('express');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { weatherFor, waypointImagesFor, trekLayers } = require('./weather');
+const { snapBase, computeTravel, farthestFromBase, travelParameters } = require('./planning');
+const { createRestZones, zonesNearRoute } = require('./restzones');
+const { missionData, nearestPerseverance } = require('./missiondata');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -9,19 +12,35 @@ const aiBackendUrl = process.env.AI_BACKEND_URL || 'http://localhost:5001';
 const aiTimeoutMs = Number(process.env.AI_TIMEOUT_MS) > 0 ? Number(process.env.AI_TIMEOUT_MS) : 300000;
 const pathingModulePromise = import(pathToFileURL(path.join(__dirname, 'pathing/src/server/routing.js')).href);
 const pathingTerrainPromise = pathingModulePromise.then(({ Terrain }) => Terrain.load(path.join(__dirname, 'pathing/src/build')));
-const systemPrompt = 'You are a helpful assistant. Respond clearly and accurately.';
+// Rest / emergency zones, computed once from the terrain grid.
+const restZonesPromise = pathingTerrainPromise.then(createRestZones);
+// Base camp is chosen by the user (POST /base); the server snaps it to the nearest passable cell.
+async function resolveBase(input) {
+    const lon = Number(input?.lon), lat = Number(input?.lat);
+    if (input == null || !Number.isFinite(lon) || !Number.isFinite(lat)) return null;
+    const terrain = await pathingTerrainPromise;
+    const base = snapBase(terrain, lon, lat);
+    if (base.available) base.point = lonLatToFrontendPoint([base.lon, base.lat], terrain);
+    return base;
+}
+const ENGLISH_RULE = 'Always answer in English, even if any input text is in another language.';
+const systemPrompt = `You are a helpful assistant. Respond clearly and accurately. ${ENGLISH_RULE}`;
 const navigationSystemPrompt = [
     'You are a practical Mars rover route analyst. Write all user-facing text in English.',
+    ENGLISH_RULE,
     'The route has already been calculated by weighted Dijkstra search. Do not modify the path or invent coordinates.',
     'If the route is marked as a least-risk fallback, state plainly that no fully passable route exists and that this alternative still crosses hazards. Explain the measured fallback risk; never call it safe or passable.',
     'Return one overview, not one explanation per waypoint. Explain why this route is preferred using only the supplied verified metrics: traversal cost, distance, surface distance, mean and maximum slope, ascent, descent, elevation, passability, depression/crater avoidance cost, nearby alternative tradeoff, and data source coverage.',
     'Explain that weighted Dijkstra minimizes the fixed balanced rover cost on this sampled grid, with a one-cell safety buffer around extreme or unknown terrain; it does not guarantee the shortest physical distance, best weather, or real-world safety. Compare the route factors clearly and mention endpoint adjustments when provided.',
     'If risk.shortestAlternative is present, compare its measured distance, balanced traversal cost, depression penalty, and adjacent blocked-cell contacts with the chosen route. Describe only differences supported by those values; do not assume the alternative is riskier. If it is absent, say the shortest and balanced objectives produced the same route.',
     'environment.weather holds measured medians for the selected local hour at Jezero (Perseverance MEDA temperature, pressure, wind and humidity; Mastcam-Z dust optical depth; Mars24 sun elevation; Curiosity RAD radiation from Gale crater). Describe them as typical measured conditions, not a forecast. Use only these supplied values; if a value is null, say it is unavailable. Soil strength is unavailable. Never invent weather conditions. Weather did not change the route geometry.',
+    'travel holds precomputed rover-plus-walking times, arrival time, EVA-window and walk-back checks, and the EVA radiation dose; quote these values as given and do not recompute them. Travel time is information only and did not change the route.',
+    'restZones lists flat, low-hazard ~1 km tiles within 2 km of the route, in order along it, with their distance to the route, score, slope and sunlight at the selected hour; you may add one short "rest stops" sentence using only these values and the longest stretch without a rest zone. Temperature and radiation are site-wide single values, not per zone.',
+    'mission holds the site-wide environment for the selected hour and season (temperature, pressure, wind, humidity, dust, UV, sun, radiation) with percentiles, and perseverance gives the nearest Perseverance waypoint to the route. These are single-site values, not per-location; you may cite them, but they did not change the route.',
     'Include a concise navigation summary describing the broad sequence of route directions and practical rover-following tips, without repeating every coordinate.',
-    'Return exactly one syntactically valid JSON object with this schema: {"why":"specific English explanation","factors":[{"name":"Slope","value":"verified value or comparison","effect":"why it matters"}],"environment":{"slope":"...","elevation":"...","surface":"...","weather":"short summary using only the supplied weather values"},"navigation":"concise English overview and practical tips"}.',
+    'Return exactly one syntactically valid JSON object with this schema: {"why":"specific English explanation","factors":[{"name":"Slope","value":"verified value or comparison","effect":"why it matters"},{"name":"Elevation","value":"...","effect":"..."},{"name":"Distance","value":"...","effect":"..."}],"environment":{"slope":"...","elevation":"...","surface":"...","weather":"short summary using only the supplied weather values"},"navigation":"concise English overview and practical tips"}.',
     'Every object property must have a colon between its name and value. Separate properties and array items with commas. Quote all property names and string values with double quotes. Do not use comments, trailing commas, or unquoted text.',
-    'The required structure is illustrated by this valid example (numbers are illustrative only; use the supplied values): {"why":"This route balances slope and climb under the fixed rover cost. It does not guarantee the shortest distance; typical measured conditions are listed below.","factors":[{"name":"Slope","value":"mean 8.2°, max 18.4°","effect":"Lower slope reduces climbing effort and slip risk."}],"environment":{"slope":"mean 8.2°","elevation":"ascent 42 m","surface":"horizontal 1200 m, surface 1210 m","weather":"air -40.0 °C, wind median 4.1 m/s"},"navigation":"Follow the route in order; confirm heading on long straight legs and slow down at turns."}.',
+    'The required structure is illustrated by this valid example (numbers are illustrative only; use the supplied values): {"why":"This route balances slope and climb under the fixed rover cost. It does not guarantee the shortest distance; typical measured conditions are listed below.","factors":[{"name":"Slope","value":"mean 8.2°, max 18.4°","effect":"Lower slope reduces climbing effort and slip risk."},{"name":"Elevation","value":"ascent 42 m, descent 30 m","effect":"Less climbing saves energy."},{"name":"Distance","value":"1.2 km","effect":"Shorter drives take less time."}],"environment":{"slope":"mean 8.2°","elevation":"ascent 42 m","surface":"horizontal 1200 m, surface 1210 m","weather":"air -40.0 °C, wind median 4.1 m/s"},"navigation":"Follow the route in order; confirm heading on long straight legs and slow down at turns."}.',
     'Use only numbers that appear in the supplied JSON (you may convert metres to kilometres). Use a dot as the decimal separator.',
     'Output only the JSON object. Do not include markdown, code fences, greetings, analysis, or text outside it.'
 ].join(' ');
@@ -82,7 +101,8 @@ function parseAssistantJson(responseData) {
 // conversion, so rounding like "about 36 km" is fine. Facts = JSON sent to the model WITHOUT route coordinates.
 // If a sentence contains an unsupported unit number, ONLY that sentence is removed; the rest of the model text stays.
 // The whole narration is replaced by the template only if its structure is invalid or "why" becomes empty.
-const UNIT_NUMBER = /(-?\d[\d.,]*\d|-?\d)\s*(°\s?C|°|K\b|km\b|m\/s|m\b|Pa\b|%|mSv|mGy)/g;
+// Speeds (km/h, m/min) are not distances, so they are excluded from the unit check.
+const UNIT_NUMBER = /(-?\d[\d.,]*\d|-?\d)\s*(°\s?C|°|K\b|km\b(?!\/h)|m\/s|m\b(?!\/min)|Pa\b|%|mSv|mGy)/g;
 // Which fact keys a unit may be compared with (unit-aware, so "27.3°" is only checked against angles).
 const UNIT_KEYS = [
     [/^°\s?C$/, /_c$|temp/],
@@ -191,20 +211,69 @@ function checkedNarration(narration, facts) {
     return { narration: out, source: problems.length ? 'model_filtered' : 'model', problems };
 }
 
+// --- English-only guard -------------------------------------------------------------------------------
+// Model answers must enter the system in English. If an answer looks Turkish, the model is asked once to
+// translate its own answer into English (keys, structure and numbers unchanged); the translation is checked
+// again, and if it is still not English the English template narration is used (narrationSource "template").
+// Turkish letters (c-cedilla, g-breve, dotless i, s-cedilla, o/u-umlaut and capitals), written as escapes so the source stays ASCII here.
+const TURKISH_LETTERS = /[\u00e7\u011f\u0131\u015f\u00f6\u00fc\u00c7\u011e\u0130\u015e\u00d6\u00dc]/;
+// Common Turkish words, also in their ASCII spellings, to catch Turkish typed without special letters.
+const TURKISH_WORDS = new Set(['ve', 'bir', 'bu', 'daha', 'ile', 'olarak', 'icin', 'gibi', 'ancak', 'fakat', 'rotasi', 'rotanin',
+    'egim', 'egimi', 'yuksek', 'dusuk', 'mesafe', 'mesafesi', 'arazi', 'guvenli', 'boyunca', 'kadar', 'sonra', 'olan', 'degil',
+    'cok', 'yolu', 'yonunde', 'dikkat', 'ortalama', 'tirmanis', 'inis', 'sicaklik', 'ruzgar', 'basinc', 'toz', 'gunes']);
+function looksNonEnglish(text) {
+    const s = String(text || '');
+    if (TURKISH_LETTERS.test(s)) return true;
+    const words = new Set(s.toLowerCase().match(/[a-z]+/g) || []);
+    let hits = 0;
+    for (const w of words) if (TURKISH_WORDS.has(w) && ++hits >= 2) return true;
+    return false;
+}
+function assistantText(responseData) {
+    return String(responseData?.choices?.[0]?.message?.content ?? responseData?.content ?? '');
+}
+const translatePrompt = [
+    'You are a translator. Translate every string value of the JSON object you receive into clear English.',
+    'Keep exactly the same keys, structure and order. Keep every number and unit exactly as written. Do not add or remove information.',
+    ENGLISH_RULE,
+    'Output only the translated JSON object, with no markdown or other text.'
+].join(' ');
+async function englishNarration(messages, facts) {
+    const problems = [];
+    const first = await requestAi(messages, navigationSystemPrompt, true, 1800);
+    let parsed = null;
+    try { parsed = parseAssistantJson(first); } catch { parsed = null; }
+    let checked = checkedNarration(parsed, facts);
+    if (!looksNonEnglish(assistantText(first)) && !looksNonEnglish(JSON.stringify(checked.narration))) {
+        return { ...checked, attempts: 1 };
+    }
+    problems.push('attempt 1: answer was not in English; asked the model to translate it');
+    // second request: translate the model's own answer (or the raw text if it was not valid JSON)
+    const translated = await requestAi([{ role: 'user', content: parsed ? JSON.stringify(parsed) : assistantText(first) }], translatePrompt, true, 1800);
+    let parsed2 = null;
+    try { parsed2 = parseAssistantJson(translated); } catch { parsed2 = null; }
+    checked = checkedNarration(parsed2, facts);
+    if (checked.source !== 'template' && !looksNonEnglish(assistantText(translated)) && !looksNonEnglish(JSON.stringify(checked.narration))) {
+        return { ...checked, source: checked.source === 'model' ? 'model_translated' : `${checked.source}_translated`, problems: [...problems, ...checked.problems], attempts: 2 };
+    }
+    problems.push('attempt 2: translation was still not English; using the English template');
+    return { narration: templateNarration(facts), source: 'template', problems, attempts: 2 };
+}
+
 function fallbackNavigationStep(waypoint) {
-    const directions = { east: 'doğuya', west: 'batıya', south: 'güneye', north: 'kuzeye' };
+    const directions = { east: 'east', west: 'west', south: 'south', north: 'north' };
     const direction = directions[waypoint.legDirection];
     const legMoves = waypoint.legGridMoves;
     return {
         instruction: direction
-            ? `${direction} ilerleyerek (${waypoint.x}, ${waypoint.y}) waypointine ulaş.`
-            : `Başlangıç waypointi (${waypoint.x}, ${waypoint.y}) konumunu doğrula.`,
+            ? `Head ${direction} to waypoint (${waypoint.x}, ${waypoint.y}).`
+            : `Confirm the start waypoint at (${waypoint.x}, ${waypoint.y}).`,
         commentary: direction
-            ? `Bu bacak ${direction} yönünde ${legMoves} ızgara hareketi sürer ve hesaplanan düşük maliyetli rover rotasını izler.`
-            : 'Bu, hesaplanan düşük maliyetli rover rotasının başlangıç noktasıdır.',
+            ? `This leg runs ${direction} for ${legMoves} grid moves and follows the computed low-cost rover route.`
+            : 'This is the start of the computed low-cost rover route.',
         tip: legMoves > 10
-            ? 'Uzun düz bacakta yönünü düzenli doğrula; sonraki dönüş waypointine yaklaşırken yavaşla.'
-            : 'Waypoint koordinatını doğrula ve yön değişiminde kontrollü ilerle.',
+            ? 'On this long straight leg, check heading regularly and slow down near the next turn.'
+            : 'Confirm the waypoint coordinate and move carefully through the turn.',
         x: waypoint.x,
         y: waypoint.y
     };
@@ -616,14 +685,53 @@ app.post('/ai', async (req, res) => {
         : prompt.trim();
 
     try {
-        return res.json(await requestAi([{ role: 'user', content }]));
+        let answer = await requestAi([{ role: 'user', content }]);
+        if (looksNonEnglish(assistantText(answer))) {
+            // ask the model to translate its own answer into English
+            const text = assistantText(answer);
+            answer = await requestAi([{ role: 'user', content: `Translate this answer into English. Keep numbers and units exactly.\n\n${text}` }]);
+            if (looksNonEnglish(assistantText(answer))) answer = { ...answer, language_warning: 'The model did not answer in English.' };
+        }
+        return res.json(answer);
     } catch (error) {
         return sendAiError(res, error);
     }
 });
 
+function siteWideConditions(weather) {
+    return {
+        label: 'site-wide (Perseverance MEDA / Curiosity RAD)',
+        note: 'Single measurements for the whole map; not used to select or rank rest zones.',
+        hour_ltst: weather?.hour_ltst ?? null,
+        air_temp_c: weather?.air_temp_c ?? null,
+        ground_temp_c: weather?.ground_temp_c ?? null,
+        radiation_msv_per_day: weather?.radiation_msv_per_day ?? null,
+        radiation_note: 'Curiosity RAD, Gale crater'
+    };
+}
+const publicZone = ({ normal, ...zone }) => zone;
+function restZonesForAi(restZones) {
+    return {
+        near_route_limit_m: restZones.near_route_limit_m,
+        count: restZones.zones.length,
+        longest_gap_m: restZones.longest_gap_m,
+        longest_gap_from_km: restZones.longest_gap_from_km,
+        longest_gap_to_km: restZones.longest_gap_to_km,
+        sun: restZones.sun,
+        zones: restZones.zones.slice(0, 10).map(z => ({
+            id: z.id, route_km: z.route_km, along_route_m: Math.round(z.route_km * 1000), distance_to_route_m: z.distance_to_route_m,
+            score: z.score, mean_slope_deg: z.mean_slope_deg, max_slope_deg: z.max_slope_deg, relief_m: z.relief_m,
+            sunlit: z.sunlit, illumination: z.illumination
+        }))
+    };
+}
+
 app.post('/route', async (req, res) => {
-    const { start, end } = req.body;
+    const { end } = req.body;
+    const startBase = req.body.startBase === true;
+    const base = await resolveBase(req.body.base).catch(() => null);
+    if (startBase && !base?.available) return res.status(400).json({ error: 'Set a base first' });
+    const start = startBase ? base.point : req.body.start;
     const hour = Number.isFinite(Number(req.body.hour)) ? Number(req.body.hour) : 13;
     const ls = Number.isFinite(Number(req.body.ls)) && req.body.ls !== null && req.body.ls !== '' ? Number(req.body.ls) : null;
     const validPoint = point => point && Number.isFinite(point.x) && Number.isFinite(point.y) &&
@@ -636,7 +744,7 @@ app.post('/route', async (req, res) => {
         const { SLOPE_LIMIT_DEG } = await pathingModulePromise;
         const pathingTerrain = await pathingTerrainPromise;
         const pathingResult = pathingTerrain.compute(
-            frontendPointToLonLat(start, pathingTerrain),
+            startBase ? { lon: base.lon, lat: base.lat } : frontendPointToLonLat(start, pathingTerrain),
             frontendPointToLonLat(end, pathingTerrain)
         );
         if (pathingResult.status !== 'ok' && pathingResult.status !== 'fallback') {
@@ -663,6 +771,18 @@ app.post('/route', async (req, res) => {
             weather: weatherFor({ hour, ls }),
             soil_strength: 'unavailable; not used in routing'
         };
+        const baseCamp = base?.available ? base : null;
+        const restZoneModel = await restZonesPromise;
+        const lit = restZoneModel.withSun(hour, ls);
+        const near = zonesNearRoute(lit.zones, balanced.geometry.coordinates, pathingTerrain, baseCamp);
+        const perseverance = nearestPerseverance(balanced.geometry.coordinates, (a, b, c, d) => pathingTerrain.groundDistance(a, b, c, d));
+        const restZones = { ...near, zones: near.zones.map(publicZone), sun: lit.sun, rules: restZoneModel.rules, site_wide: siteWideConditions(environment.weather) };
+        const travel = computeTravel({
+            route_length_m: balanced.surface_distance_m,
+            farthest_from_base_m: farthestFromBase(balanced.geometry.coordinates, baseCamp, pathingTerrain),
+            radiation_msv_per_day: environment.weather?.radiation_msv_per_day ?? null,
+            settings: req.body.travel || {}
+        });
         const profile = routeProfile(balanced.geometry.coordinates, pathingTerrain);
         const shortest = pathingResult.routes.find(route => route.objective === 'shortest');
         const risk = {
@@ -687,6 +807,7 @@ app.post('/route', async (req, res) => {
             traversalCost: balanced.cost_breakdown.balanced_cost,
             slopeLimit: SLOPE_LIMIT_DEG,
             startAdjusted: route[0].x !== start.x || route[0].y !== start.y,
+            startIsBase: startBase,
             endAdjusted: route[route.length - 1].x !== end.x || route[route.length - 1].y !== end.y,
             engine: 'pathing/src/server/routing.js',
             depression_avoidance: 'multi-scale DEM depression penalty discourages crater-like basins; extreme slopes remain impassable',
@@ -700,30 +821,30 @@ app.post('/route', async (req, res) => {
             profile,
             risk,
             optimality,
+            travel,
+            restZones,
+            perseverance,
             status: pathingResult.status,
             fallback: pathingResult.status === 'fallback',
             routeWarning: pathingResult.status === 'fallback' ? pathingResult.reason?.message : null,
             validation: balanced.validation
         };
         try {
-            const aiResponse = await requestAi([{
+            const { sources, ...mission } = missionData({ hour, ls });
+            const perseveranceForAi = perseverance.available ? { sol: perseverance.sol, site: perseverance.site, drive: perseverance.drive, distance_m: perseverance.distance_m } : null;
+            const facts = { optimality, environment, risk, travel, restZones: restZonesForAi(restZones), mission, perseverance: perseveranceForAi,
+                status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
+            const checked = await englishNarration([{
                 role: 'user',
                 content: JSON.stringify({
                     task: 'Explain why this computed rover route is preferred using a single evidence-based overview.',
-                    route, optimality, environment, risk,
-                    status: pathingResult.status,
-                    fallback: pathingResult.status === 'fallback',
-                    routeWarning: response.routeWarning,
-                    validation: balanced.validation
+                    route, ...facts, routeWarning: response.routeWarning
                 })
-            }], navigationSystemPrompt, true, 1800);
-            const facts = { optimality, environment, risk, status: pathingResult.status, fallback: response.fallback, validation: balanced.validation };
-            let parsed = null;
-            try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
-            const checked = checkedNarration(parsed, facts);
+            }], facts);
             response.narration = checked.narration;
             response.narrationSource = checked.source;
             response.narrationCheck = checked.problems;
+            response.narrationAttempts = checked.attempts;
         } catch (error) {
             response.narrationError = error.message || 'AI narration unavailable';
         }
@@ -745,19 +866,15 @@ app.post('/ai/narrate', async (req, res) => {
     }
 
     try {
-        const aiResponse = await requestAi([{
+        const facts = { optimality, environment, risk: risk || null };
+        const checked = await englishNarration([{
             role: 'user',
             content: JSON.stringify({
                 task: 'Explain why this computed rover route is preferred using a single evidence-based overview.',
-                optimality,
-                environment,
-                risk: risk || null,
+                ...facts,
                 route
             })
-        }], navigationSystemPrompt, true, 1800);
-        let parsed = null;
-        try { parsed = parseAssistantJson(aiResponse); } catch { parsed = null; }
-        const checked = checkedNarration(parsed, { optimality, environment, risk: risk || null });
+        }], facts);
         return res.json({ ...checked.narration, source: checked.source, check: checked.problems });
     } catch (error) {
         return sendAiError(res, error);
@@ -770,6 +887,72 @@ app.get('/weather', (req, res) => {
 });
 app.get('/waypoint-images', (req, res) => {
     res.json(waypointImagesFor(req.query.site, req.query.drive));
+});
+app.get('/mission-data', (req, res) => res.json(missionData({ hour: req.query.hour ?? 13, ls: req.query.ls ?? null })));
+app.get('/travel-parameters', (req, res) => res.json(travelParameters()));
+app.post('/travel', async (req, res) => {
+    const length = Number(req.body?.route_length_m);
+    if (!Number.isFinite(length) || length < 0) return res.status(400).json({ error: 'route_length_m must be a non-negative number' });
+    const farthest = Number(req.body?.farthest_from_base_m);
+    const radiation = weatherFor({ hour: 13 }).radiation_msv_per_day ?? null;
+    return res.json(computeTravel({
+        route_length_m: length,
+        farthest_from_base_m: Number.isFinite(farthest) ? farthest : null,
+        radiation_msv_per_day: radiation,
+        settings: req.body?.settings || {}
+    }));
+});
+app.get('/rest-zones', async (req, res) => {
+    try {
+        const hour = Number.isFinite(Number(req.query.hour)) && req.query.hour !== '' ? Number(req.query.hour) : 13;
+        const ls = req.query.ls ?? null;
+        const [model, terrain, base] = await Promise.all([restZonesPromise, pathingTerrainPromise,
+            resolveBase(req.query.baseLon != null ? { lon: req.query.baseLon, lat: req.query.baseLat } : null).catch(() => null)]);
+        const { sun, zones } = model.withSun(hour, ls);
+        return res.json({
+            count: zones.length,
+            tiles_checked: model.total,
+            tile_size_m: Math.round(model.tileCells * terrain.dy),
+            rules: model.rules,
+            score_formula: '100 * (0.5*(1 - mean_slope/max_mean_slope) + 0.3*(1 - relief/max_relief) + 0.2*(1 - mean_depression/max_mean_depression))',
+            sun,
+            site_wide: siteWideConditions(weatherFor({ hour, ls })),
+            zones: zones.map(zone => ({
+                ...publicZone(zone),
+                distance_to_base_m: base?.available ? Math.round(terrain.groundDistance(base.lon, base.lat, zone.lon, zone.lat)) : null
+            }))
+        });
+    } catch (error) {
+        return res.status(500).json({ error: 'Unable to compute rest zones', details: error.message });
+    }
+});
+// Default base: the exact centre of the Jezero map image. The image is drawn on the terrain grid's bounds
+// (the same bounds /terrain returns), so the centre comes from those bounds, never from typed-in numbers.
+async function defaultBase() {
+    const terrain = await pathingTerrainPromise;
+    const b = terrain.meta.grid.bounds_lonlat;
+    const lat = (b.south + b.north) / 2, lon = (b.west + b.east) / 2;
+    const base = snapBase(terrain, lon, lat);
+    if (base.available) base.point = lonLatToFrontendPoint([base.lon, base.lat], terrain);
+    const [row, col] = terrain.cellOf(lon, lat);
+    return { ...base, is_default: true, map_centre: { lat, lon, row, col, grid_rows: terrain.H, grid_cols: terrain.W, bounds: b } };
+}
+app.get('/base/default', async (req, res) => {
+    try {
+        const base = await defaultBase();
+        return res.status(base.available ? 200 : 422).json(base);
+    } catch (error) {
+        return res.status(500).json({ error: 'Unable to compute the default base', details: error.message });
+    }
+});
+app.post('/base', async (req, res) => {
+    try {
+        const base = await resolveBase(req.body);
+        if (!base) return res.status(400).json({ error: 'lon and lat are required' });
+        return res.status(base.available ? 200 : 422).json(base);
+    } catch (error) {
+        return res.status(500).json({ error: 'Unable to set base camp', details: error.message });
+    }
 });
 app.get('/trek-layers', (req, res) => {
     res.json(trekLayers || { status: 'not_ready', layers: [] });

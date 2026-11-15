@@ -1,13 +1,13 @@
 'use strict';
-// weather.js — data/ klasorundeki NASA verilerini (MEDA, Mastcam-Z, Mars24, Raw Images) sunucuya verir.
-// Dosya yoksa ya da bozuksa sunucu cokmez; ilgili alan "unavailable" doner.
+// weather.js — serves the NASA data in data/ (MEDA, Mastcam-Z, Mars24, Raw Images) to the server.
+// If a file is missing or broken the server does not crash; the related field returns "unavailable".
 const fs = require('node:fs');
 const path = require('node:path');
 
 const DATA = path.join(__dirname, 'data');
 function load(name) {
     try { return JSON.parse(fs.readFileSync(path.join(DATA, name), 'utf8')); }
-    catch (error) { console.warn(`data/${name} okunamadi: ${error.message}`); return null; }
+    catch (error) { console.warn(`data/${name} could not be read: ${error.message}`); return null; }
 }
 const env = load('environment_meda.json');
 const sun = load('sun_elevation.json');
@@ -26,8 +26,8 @@ function nearestSeason(ls) {
 }
 
 /**
- * Secilen saat (LTST, 0-23) ve istege bagli mevsim (Ls, derece) icin cevre ozeti.
- * Butun sayilar data/ dosyalarindan gelir; hesap yapilan tek yer derece->Celsius ve yuvarlama.
+ * Environment summary for the selected hour (LTST, 0-23) and optional season (Ls, degrees).
+ * Every number comes from the data/ files; the only computation is unit conversion and rounding.
  */
 function weatherFor({ hour = 13, ls = null } = {}) {
     if (!env) return { available: false, note: 'environment data file missing' };
