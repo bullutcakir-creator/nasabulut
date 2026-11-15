@@ -94,7 +94,14 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .tgrid .tlabel{display:block;font-size:12px;color:var(--muted)}
 .tgrid .tval{display:block;margin-top:2px;padding:5px 0;font:600 13px var(--mono);color:var(--text)}
 .tgrid small{display:block;font-size:10.5px;line-height:1.3;color:var(--dim);margin-top:2px}
-.zonebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:0 4px 8px;font-size:12.5px;color:var(--muted)}
+.zonebar{margin:0 4px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg2);font-size:12.5px;color:var(--muted)}
+.zonebar summary{cursor:pointer;padding:6px 10px;font-weight:600;color:var(--text)}
+.zonebody{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:0 10px 8px}
+.zonebody .switch{display:inline-flex;gap:6px;align-items:center;color:var(--text)}
+.zonebody .switch input{accent-color:var(--accent);width:16px;height:16px}
+.zlegend{display:inline-flex;gap:6px;align-items:center}
+.zlegend i{display:inline-block;width:13px;height:13px;border:2px solid;margin-left:4px}
+.znote{flex-basis:100%;font-size:11.5px;color:var(--dim)}
 .zonebar select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:4px;padding:4px 6px;font:12.5px var(--mono)}
 .btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
 .zlist{list-style:none;margin:0;padding:0;font-size:12.5px}
@@ -102,6 +109,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .zlist li:hover{background:var(--panel2)}
 .zlist .km{font:600 12px var(--mono);color:var(--accent);grid-row:span 2}
 .zlist .meta{font:11.5px var(--mono);color:var(--muted)}
+.znum{display:inline-block;min-width:20px;height:20px;line-height:20px;margin-right:4px;border-radius:50%;background:#ff3d8b;color:#fff;text-align:center;font:700 11px var(--mono)}
 .lit{color:var(--short)} .shade{color:var(--dim)}
 .infobox{margin-top:8px;padding:8px 10px;border-radius:6px;border:1px solid var(--line);background:var(--bg2);font-size:12.5px}
 .stats .sec{grid-column:1/-1;font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em;padding-top:10px}
@@ -182,11 +190,16 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
           <button class="btn" id="swap">A ⇄ B</button>
         </div>
       </div>
-      <div class="zonebar">
-        <button class="btn" id="zonesToggle" type="button" aria-pressed="true" title="Show or hide flat, low-hazard ~1 km rest / emergency zones">Rest zones</button>
-        <label>Sun hour (LTST) <select id="sunHour"></select></label>
-        <span id="zoneSummary"></span>
-      </div>
+      <details class="zonebar" id="restPanel" open>
+        <summary>Rest stations</summary>
+        <div class="zonebody">
+          <label class="switch"><input type="checkbox" id="zonesToggle" checked> Show all rest stations</label>
+          <label>Sun hour (LTST) <select id="sunHour"></select></label>
+          <span id="zoneSummary"></span>
+          <span class="zlegend"><i style="background:rgba(61,255,176,.6);border-color:#0b3d2a"></i>Sunlit <i style="background:rgba(154,166,192,.6);border-color:#1d2333"></i>Shaded <i style="background:rgba(255,61,139,.75);border-color:#fff"></i>Near route (numbered)</span>
+          <span class="znote">Flat, low-hazard ~1 km tiles for rest or emergency stops. Stations near a calculated route stay visible when this is off.</span>
+        </div>
+      </details>
       <div id="guide"></div>
       <div class="mapbox" id="mapbox">
         <canvas id="globe" tabindex="0" aria-label="Mars globe and Jezero terrain map"></canvas>
@@ -211,7 +224,7 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
         <div class="note" style="margin-top:8px;font-size:12px">Slope source: CTX 20 m + partial HiRISE 1 m. The AI does not generate terrain values.</div>
       </div>
       <div class="card" id="restCard">
-        <h3>Rest stops along the route</h3>
+        <h3>Rest stations along the route</h3>
         <div class="note" style="font-size:12px;margin-bottom:6px">Flat, low-hazard ~1 km tiles within 2 km of the route, in order. Click one for details.</div>
         <div id="restSummary" class="note" style="font-size:12.5px"></div>
         <ul class="zlist" id="restList"></ul>
@@ -466,13 +479,12 @@ function updateScale(){
   $('scaleLabel').textContent=label;
   $('scaleBar').style.width=`${width}px`;
 }
-function animateGlobe(){requestAnimationFrame(animateGlobe);scaleControls();controls.update();renderer.render(scene,camera);}
+function animateGlobe(){requestAnimationFrame(animateGlobe);stepFlight();scaleControls();controls.update();updateZoneLayer();renderer.render(scene,camera);}
 controls.addEventListener('change',updateScale);
 
 function renderLegend(){
   const common='<span><span class="sw" style="background:var(--safe)"></span>Computed route</span>'+
-    (showZones?'<span><span class="sw" style="background:#7dff9b;height:9px;opacity:.7"></span>Rest zone, sunlit</span><span><span class="sw" style="background:#8a93a6;height:9px"></span>Rest zone, shaded</span><span><span class="sw" style="background:#ffd27a;height:9px"></span>Near route</span>':'')+
-    '<span>Pick points inside the Jezero data area; click a rest zone for details (use Set A/B or the A/B keys to route into one)</span>';
+    '<span>Pick points inside the Jezero data area; click a rest station for details (use Set A/B or the A/B keys to route into one)</span>';
   const detail=layer==='slope'
     ? `<span>Green → red slope · red areas &gt; ${P.limit}°</span>`
     : layer==='haz' ? '<span>Red areas: slope impassable for the rover</span>'
@@ -556,44 +568,112 @@ function surfaceAt(lon,lat,offset=0.00016){
   return geoVector(lon,lat,radius);
 }
 function nearRouteIds(){ return new Set((safe?.restZones?.zones||[]).map(z=>z.id)); }
-function addZoneTiles(){
-  if(!showZones||!ZONES?.zones?.length||!T.renderH) return;
-  const near=nearRouteIds(), n=4;
-  const groups={near:[],lit:[],shade:[]}, outlines={near:[],other:[]};
-  for(const z of ZONES.zones){
-    const b=z.bounds, kind=near.has(z.id)?'near':(z.sunlit?'lit':'shade');
-    const grid=[];
-    for(let i=0;i<=n;i++) for(let j=0;j<=n;j++) grid.push(surfaceAt(b.west+(b.east-b.west)*j/n,b.north-(b.north-b.south)*i/n));
-    const at=(i,j)=>grid[i*(n+1)+j];
-    for(let i=0;i<n;i++) for(let j=0;j<n;j++){ const a=at(i,j),bq=at(i+1,j),c=at(i,j+1),d=at(i+1,j+1); groups[kind].push(a,bq,c,c,bq,d); }
-    const ring=[...Array(n+1).keys()].map(j=>at(0,j)).concat([...Array(n+1).keys()].map(i=>at(i,n)),[...Array(n+1).keys()].reverse().map(j=>at(n,j)),[...Array(n+1).keys()].reverse().map(i=>at(i,0)));
-    const line=outlines[kind==='near'?'near':'other'];
-    for(let k=1;k<ring.length;k++) line.push(ring[k-1],ring[k]);
-  }
-  const colors={near:[0xffd27a,0.55],lit:[0x7dff9b,0.28],shade:[0x8a93a6,0.28]};
-  for(const [kind,verts] of Object.entries(groups)){
-    if(!verts.length) continue;
-    const g=new THREE.BufferGeometry().setFromPoints(verts);
-    const m=new THREE.MeshBasicMaterial({color:colors[kind][0],transparent:true,opacity:colors[kind][1],depthWrite:false,side:THREE.DoubleSide});
-    const mesh=new THREE.Mesh(g,m); mesh.renderOrder=2; overlayGroup.add(mesh);
-  }
-  for(const [kind,verts] of Object.entries(outlines)){
-    if(!verts.length) continue;
-    const g=new THREE.BufferGeometry().setFromPoints(verts);
-    const line=new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:kind==='near'?0xffd27a:0xd8f5df,transparent:true,opacity:kind==='near'?0.95:0.6,depthWrite:false}));
-    line.renderOrder=3; overlayGroup.add(line);
-  }
+// Rest stations are drawn on top of the imagery (no depth test) so the terrain texture never hides them.
+// Each station has a world-size tile (fill + thick border ring) and a fixed-pixel square marker, so it stays
+// visible and clickable at every zoom level. Stations near the route get a bright fill and a numbered label.
+const zoneLayer=new THREE.Group(); zoneLayer.renderOrder=6; globeGroup.add(zoneLayer);
+let zoneMarkerTextures=null, zoneHitList=[];
+function squareTexture(fill,border,borderPx){
+  const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  g.fillStyle=fill; g.fillRect(0,0,64,64); g.lineWidth=borderPx; g.strokeStyle=border; g.strokeRect(borderPx/2,borderPx/2,64-borderPx,64-borderPx);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
 }
-function zoneAt(lon,lat){
-  if(!showZones||!ZONES?.zones) return null;
-  return ZONES.zones.find(z=>lon>=z.bounds.west&&lon<=z.bounds.east&&lat>=z.bounds.south&&lat<=z.bounds.north)||null;
+function numberSprite(n){
+  const c=document.createElement('canvas'); c.width=c.height=64; const g=c.getContext('2d');
+  g.beginPath(); g.arc(32,32,26,0,Math.PI*2); g.fillStyle='#ff3d8b'; g.fill(); g.lineWidth=5; g.strokeStyle='#fff'; g.stroke();
+  g.fillStyle='#fff'; g.font='700 30px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(String(n),32,34);
+  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false,depthWrite:false,sizeAttenuation:false}));
+  s.scale.setScalar(0.027); s.renderOrder=9; return s;
+}
+const ZONE_STYLE={near:{fill:0xff3d8b,opacity:0.55,ring:0xffffff},lit:{fill:0x3dffb0,opacity:0.42,ring:0x0b3d2a},shade:{fill:0x9aa6c0,opacity:0.42,ring:0x1d2333}};
+function zoneKind(z,near){ return near.has(z.id)?'near':(z.sunlit?'lit':'shade'); }
+function clearZoneLayer(){
+  while(zoneLayer.children.length){ const o=zoneLayer.children.pop(); o.geometry?.dispose(); o.material?.map?.dispose(); o.material?.dispose(); }
+}
+function addZoneTiles(){
+  clearZoneLayer(); zoneHitList=[];
+  if(!ZONES?.zones?.length||!T.renderH) return;
+  const nearList=safe?.restZones?.zones||[], near=new Set(nearList.map(z=>z.id));
+  // panel off: only stations near the current route stay visible
+  const zones=showZones?ZONES.zones:ZONES.zones.filter(z=>near.has(z.id));
+  if(!zones.length) return;
+  const fills={near:[],lit:[],shade:[]}, rings={near:[],lit:[],shade:[]}, markers={near:[],lit:[],shade:[]};
+  const n=4;
+  for(const z of zones){
+    const kind=zoneKind(z,near), bb=z.bounds, w=bb.east-bb.west, h=bb.north-bb.south;
+    const at=(fx,fy)=>surfaceAt(bb.west+w*fx,bb.north-h*fy,0.00022);
+    for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+      const p=at(j/n,i/n),q=at(j/n,(i+1)/n),r=at((j+1)/n,i/n),t=at((j+1)/n,(i+1)/n); fills[kind].push(p,q,r,r,q,t);
+    }
+    // thick border: a ring of quads, 9% of the tile wide (14% for stations near the route)
+    const k=kind==='near'?0.14:0.09;
+    const ringQuad=(x0,y0,x1,y1)=>{ const p=at(x0,y0),q=at(x0,y1),r=at(x1,y0),t=at(x1,y1); rings[kind].push(p,q,r,r,q,t); };
+    ringQuad(0,0,1,k); ringQuad(0,1-k,1,1); ringQuad(0,k,k,1-k); ringQuad(1-k,k,1,1-k);
+    const centre=surfaceAt(z.lon,z.lat,0.00026);
+    markers[kind].push(centre);
+    zoneHitList.push({zone:z,pos:centre,near:kind==='near'});
+  }
+  if(!zoneMarkerTextures) zoneMarkerTextures={near:squareTexture('rgba(255,61,139,.75)','#ffffff',12),lit:squareTexture('rgba(61,255,176,.6)','#0b3d2a',10),shade:squareTexture('rgba(154,166,192,.6)','#1d2333',10)};
+  for(const kind of ['shade','lit','near']){
+    const st=ZONE_STYLE[kind];
+    if(fills[kind].length){
+      const m=new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(fills[kind]),new THREE.MeshBasicMaterial({color:st.fill,transparent:true,opacity:st.opacity,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));
+      m.renderOrder=kind==='near'?8:7; zoneLayer.add(m);
+      const r=new THREE.Mesh(new THREE.BufferGeometry().setFromPoints(rings[kind]),new THREE.MeshBasicMaterial({color:st.ring,transparent:true,opacity:0.95,depthTest:false,depthWrite:false,side:THREE.DoubleSide}));
+      r.renderOrder=kind==='near'?8:7; zoneLayer.add(r);
+      const pts=new THREE.Points(new THREE.BufferGeometry().setFromPoints(markers[kind]),new THREE.PointsMaterial({map:zoneMarkerTextures[kind],size:kind==='near'?16:10,sizeAttenuation:false,transparent:true,depthTest:false,depthWrite:false}));
+      pts.renderOrder=kind==='near'?8:7; pts.name='zoneMarkers'; zoneLayer.add(pts);
+    }
+  }
+  nearList.forEach((z,i)=>{ const full=ZONES.zones.find(x=>x.id===z.id)||z; const sp=numberSprite(i+1); sp.position.copy(surfaceAt(full.lon,full.lat,0.0003)); sp.center.set(0.5,-0.25); zoneLayer.add(sp); });
+}
+// show the layer only when Jezero faces the camera (no depth test, so it would otherwise show through the planet),
+// and hide the fixed-pixel markers once a tile is bigger on screen than its marker
+function updateZoneLayer(){
+  if(!zoneLayer.children.length) return;
+  const dir=geoVector(77.69,18.41).normalize();
+  zoneLayer.visible=camera.position.dot(dir)>1.0005;
+  const rect=canvas.getBoundingClientRect(); if(!rect.height) return;
+  const altitude=Math.max(camera.position.length()-1,0.00001);
+  const tilePx=1020/(2*altitude*Math.tan(camera.fov/2/DEG)*MARS_RADIUS_M/rect.height);
+  for(const o of zoneLayer.children) if(o.name==='zoneMarkers') o.visible=tilePx<18;
+}
+function zoneAtScreen(event){
+  if(!zoneLayer.visible||!zoneHitList.length) return null;
+  const rect=canvas.getBoundingClientRect();
+  const altitude=Math.max(camera.position.length()-1,0.00001);
+  const halfTilePx=510/(2*altitude*Math.tan(camera.fov/2/DEG)*MARS_RADIUS_M/rect.height);
+  let best=null, bestD=Infinity;
+  for(const h of zoneHitList){
+    const p=h.pos.clone().applyMatrix4(globeGroup.matrixWorld).project(camera);
+    if(p.z>1) continue;
+    const x=(p.x+1)/2*rect.width+rect.left, y=(1-p.y)/2*rect.height+rect.top;
+    const dx=Math.abs(event.clientX-x), dy=Math.abs(event.clientY-y);
+    const reach=Math.max(halfTilePx,h.near?10:7);
+    if(dx<=reach&&dy<=reach){ const d=dx+dy; if(d<bestD){ bestD=d; best=h.zone; } }
+  }
+  return best;
+}
+let flight=null;
+function flyTo(lon,lat,altitude=0.005){
+  const from=camera.position.clone(), to=geoVector(lon,lat).normalize().multiplyScalar(1+altitude);
+  flight={from,to,t0:performance.now(),ms:700};
+}
+function stepFlight(){
+  if(!flight) return;
+  const t=Math.min(1,(performance.now()-flight.t0)/flight.ms), e=t*t*(3-2*t);
+  const dir=flight.from.clone().normalize().lerp(flight.to.clone().normalize(),e).normalize();
+  const len=flight.from.length()+(flight.to.length()-flight.from.length())*e;
+  camera.position.copy(dir.multiplyScalar(len)); controls.update(); updateScale();
+  if(t>=1) flight=null;
 }
 function showZonePopup(zone){
   const nearInfo=(safe?.restZones?.zones||[]).find(z=>z.id===zone.id);
   const sun=ZONES?.sun, site=ZONES?.site_wide||{};
   const light=zone.sunlit?`<span class="lit">sunlit</span> (${f2(zone.illumination,2)})`:`<span class="shade">shaded</span>${zone.shade_reason?' – '+zone.shade_reason:''}`;
   const v=(x,u,d=1)=>Number.isFinite(x)?f2(x,d)+u:'no data';
-  showPopup(`<h4>Rest zone ${zone.id}</h4><div class="kv">
+  showPopup(`<h4>Rest station ${zone.id}</h4><div class="kv">
     <div>Score (0–100)</div><div class="v">${f1(zone.score)}</div>
     <div>Mean slope</div><div class="v">${f2(zone.mean_slope_deg)}°</div>
     <div>Max slope (one 60 m cell)</div><div class="v">${f2(zone.max_slope_deg)}°</div>
@@ -612,30 +692,30 @@ function showZonePopup(zone){
     <div class="tag">Distances</div><div class="kv">
     <div>To base</div><div class="v">${zone.distance_to_base_m==null?'—':f2(zone.distance_to_base_m/1000,2)+' km'}</div>
     <div>To route</div><div class="v">${nearInfo?f2(nearInfo.distance_to_route_m/1000,2)+' km (at route km '+f2(nearInfo.route_km,2)+')':(safe?'more than 2 km':'no route yet')}</div></div>
-    <div class="muted">${sun?.season_note||''}. Temperature and radiation are single site values; zones are not ranked by them.</div>`);
+    <div class="muted">${sun?.season_note||''}. Temperature and radiation are single site values; stations are not ranked by them.</div>`);
 }
 async function loadRestZones(){
   try{
     const response=await fetch('/rest-zones?hour='+sunHour+(BASE?.available?`&baseLon=${BASE.lon}&baseLat=${BASE.lat}`:''));
     if(!response.ok) throw new Error();
     ZONES=await response.json();
-    $('zoneSummary').textContent=`${ZONES.count} zones · sun ${f1(ZONES.sun.elevation_deg)}° · ${ZONES.zones.filter(z=>z.sunlit).length} sunlit`;
-  }catch(error){ ZONES=null; $('zoneSummary').textContent='Rest zones unavailable'; }
+    $('zoneSummary').textContent=`${ZONES.count} stations · sun ${f1(ZONES.sun.elevation_deg)}° · ${ZONES.zones.filter(z=>z.sunlit).length} sunlit`;
+  }catch(error){ ZONES=null; $('zoneSummary').textContent='Rest stations unavailable'; }
   drawOverlay();
 }
 function renderRestList(){
   const list=$('restList'), sum=$('restSummary'), rz=safe?.restZones;
   list.replaceChildren();
-  if(!rz){ sum.textContent=routeLoading?'Processing…':'Calculate a route to list rest stops.'; return; }
+  if(!rz){ sum.textContent=routeLoading?'Processing…':'Calculate a route to list rest stations.'; return; }
   sum.innerHTML=rz.zones.length
-    ? `${rz.zones.length} zone${rz.zones.length>1?'s':''} within ${f2(rz.near_route_limit_m/1000)} km. Longest stretch without one: <b>${f2(rz.longest_gap_m/1000,2)} km</b> (route km ${f2(rz.longest_gap_from_km,2)}–${f2(rz.longest_gap_to_km,2)}).`
-    : `No rest zone within ${f2(rz.near_route_limit_m/1000)} km of this route (${f2(rz.route_length_m/1000,2)} km without one).`;
-  for(const z of rz.zones){
+    ? `${rz.zones.length} station${rz.zones.length>1?'s':''} within ${f2(rz.near_route_limit_m/1000)} km. Longest stretch without one: <b>${f2(rz.longest_gap_m/1000,2)} km</b> (route km ${f2(rz.longest_gap_from_km,2)}–${f2(rz.longest_gap_to_km,2)}).`
+    : `No rest station within ${f2(rz.near_route_limit_m/1000)} km of this route (${f2(rz.route_length_m/1000,2)} km without one).`;
+  rz.zones.forEach((z,i)=>{
     const li=document.createElement('li');
-    li.innerHTML=`<span class="km">km ${f2(z.route_km,1)}</span><span>${z.id} · score ${f1(z.score)}</span><span class="meta">${f2(z.distance_to_route_m/1000,2)} km off route · slope ${f2(z.mean_slope_deg)}° · ${z.sunlit?'<span class="lit">sunlit '+f2(z.illumination,2)+'</span>':'<span class="shade">shaded</span>'}</span>`;
-    li.addEventListener('click',()=>showZonePopup(ZONES?.zones.find(x=>x.id===z.id)||z));
+    li.innerHTML=`<span class="km"><b class="znum">${i+1}</b> km ${f2(z.route_km,1)}</span><span>${z.id} · score ${f1(z.score)}</span><span class="meta">${f2(z.distance_to_route_m/1000,2)} km off route · slope ${f2(z.mean_slope_deg)}° · ${z.sunlit?'<span class="lit">sunlit '+f2(z.illumination,2)+'</span>':'<span class="shade">shaded</span>'}</span>`;
+    li.addEventListener('click',()=>{ const full=ZONES?.zones.find(x=>x.id===z.id)||z; flyTo(full.lon,full.lat); showZonePopup(full); });
     list.append(li);
-  }
+  });
 }
 function baseSurfacePoint(){
   const point=routeSurfacePoint(BASE.point), geo={lon:BASE.lon,lat:BASE.lat};
@@ -1060,8 +1140,7 @@ function endGlobePointer(event){
   if(baseScreenDistance(event)<22){ showBasePopup(); return; }
   const point=selectedPoint;
   if(!point)return;
-  const zoneHit=hitTerrain(event), zp=zoneHit?.point?.clone().normalize();
-  const zone=zp?zoneAt(Math.atan2(zp.x,zp.z)*DEG,Math.asin(clamp(zp.y,-1,1))*DEG):null;
+  const zone=zoneAtScreen(event);
   if(zone){ showZonePopup(zone); return; }
   if(routeMode==='base') setRoutePoint('B',point);
   else if(!A||B){setRoutePoint('A',point);}
@@ -1119,7 +1198,7 @@ $('setBase').addEventListener('click',()=>{ pickingBase=!pickingBase; hidePopup(
 $('resetBase').addEventListener('click',resetBase);
 for(let h=0;h<24;h++){ const o=document.createElement('option'); o.value=h; o.textContent=String(h).padStart(2,'0')+':00'; if(h===sunHour) o.selected=true; $('sunHour').append(o); }
 $('sunHour').addEventListener('change',()=>{ sunHour=Number($('sunHour').value); hidePopup(); loadRestZones(); if(safe){ routeDirty=true; renderGuide(); } });
-$('zonesToggle').addEventListener('click',()=>{ showZones=!showZones; $('zonesToggle').setAttribute('aria-pressed',String(showZones)); hidePopup(); drawOverlay(); renderLegend(); });
+$('zonesToggle').addEventListener('change',()=>{ showZones=$('zonesToggle').checked; hidePopup(); drawOverlay(); renderLegend(); });
 $('tStart').addEventListener('input',onTravelInput);
 async function loadTravelParameters(){
   try{
