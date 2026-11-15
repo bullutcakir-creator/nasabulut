@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mars Rover: Jezero Route Map</title>
+<script>try{if(localStorage.getItem('theme')==='light')document.documentElement.dataset.theme='light';}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <style>
@@ -12,11 +13,21 @@
   --text:#ededed; --muted:#b8b8b8; --dim:#888;
   --accent:#e5a84b; --safe:#69d7e8; --short:#ffd27a; --danger:#ff5a5a; --ok:#7dff9b; --rock:#b9a2ff; --sand:#f0d070;
   --mono:'JetBrains Mono',ui-monospace,monospace; --sans:'Space Grotesk',system-ui,sans-serif;
+  --card-text:#e2d2c5; --tip-bg:rgba(13,9,7,.94); --chart-axis:#806e62; --chart-grid:#35261d; --chart-line:#6fe3ff; --chart-hover:rgba(255,255,255,.6);
+  color-scheme:dark;
+}
+[data-theme="light"]{
+  --bg:#f3f1ed; --bg2:#e9e5df; --panel:#ffffff; --panel2:#f1eee9; --line:#d3ccc2;
+  --text:#1c1b1a; --muted:#4f4b46; --dim:#6f6a63;
+  --accent:#a3620c; --safe:#0a7489; --short:#7d5a00; --danger:#c42b2b; --ok:#1c7a37; --rock:#6a4fc7; --sand:#8a6d00;
+  --card-text:#2b2724; --tip-bg:rgba(255,255,255,.96); --chart-axis:#6f6a63; --chart-grid:#e1dbd2; --chart-line:#0a7489; --chart-hover:rgba(0,0,0,.45);
+  color-scheme:light;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.55}
 .wrap{max-width:1260px;margin:0 auto;padding:0 20px}
 header.hero{padding:12px 0;border-bottom:1px solid var(--line);background:var(--bg)}
+header.hero .wrap{display:flex;justify-content:space-between;align-items:center;gap:12px}
 .kicker{font:600 12px var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
 h1{font-size:30px;line-height:1.1;margin:7px 0 5px}
 h1 span{color:var(--safe)}
@@ -45,7 +56,7 @@ section{padding:34px 0;border-top:1px solid var(--line)}
 #scale .bar{height:5px;border:1px solid #fff;border-top:0;margin-top:3px;box-shadow:0 1px 2px #000}
 #guide{margin:0 0 7px;background:transparent;border-left:2px solid var(--accent);padding:5px 9px;font-size:13px;line-height:1.35}
 #guide b{color:var(--accent)}
-#tip{position:absolute;pointer-events:none;background:rgba(13,9,7,.94);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:12px/1.45 var(--mono);display:none;white-space:nowrap;z-index:3}
+#tip{position:absolute;pointer-events:none;background:var(--tip-bg);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:12px/1.45 var(--mono);display:none;white-space:nowrap;z-index:3}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;padding:10px 4px 2px;font-size:12.5px;color:var(--muted)}
 .legend .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:6px}
 .legend .grad{display:inline-block;width:110px;height:9px;border-radius:3px;vertical-align:middle;margin:0 6px}
@@ -64,10 +75,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .stats div{padding:6px 5px;border-bottom:1px solid var(--line);white-space:nowrap}
 .stats .h{font:600 10.5px var(--mono);color:var(--dim);text-transform:uppercase;letter-spacing:.05em;text-align:right}
 .stats .v{font-family:var(--mono);text-align:right;font-size:12px}
-.stats .c1{color:var(--safe)} .stats .c2{color:var(--short)} .stats .c3{color:#d8c7ba}
+.stats .c1{color:var(--safe)} .stats .c2{color:var(--short)} .stats .c3{color:var(--card-text)}
 .stats .bad{color:var(--danger)} .stats .good{color:var(--ok)}
 .note{font-size:13px;color:var(--muted)}
-.warnbox{display:none;margin-top:10px;padding:10px;border-radius:9px;background:rgba(255,90,90,.12);border:1px solid rgba(255,90,90,.4);font-size:13px}
+.warnbox{display:none;margin-top:10px;padding:10px;border-radius:9px;background:color-mix(in srgb,var(--danger) 12%,transparent);border:1px solid color-mix(in srgb,var(--danger) 45%,transparent);font-size:13px}
 
 /* charts */
 .charts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -80,7 +91,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .why{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:18px}
 @media (max-width:860px){.why{grid-template-columns:1fr}}
 #reasons{list-style:none;margin:0;padding:0;counter-reset:r}
-#reasons li{position:relative;padding:12px 14px 12px 48px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--panel);font-size:14.5px;color:#e8d9cc}
+#reasons li{position:relative;padding:12px 14px 12px 48px;border:1px solid var(--line);border-radius:11px;margin-bottom:10px;background:var(--panel);font-size:14.5px;color:var(--card-text)}
 #reasons li b{color:var(--text)}
 #reasons li::before{counter-increment:r;content:counter(r);position:absolute;left:12px;top:12px;width:25px;height:25px;border-radius:50%;background:var(--panel2);border:1px solid var(--line);font:600 12px/23px var(--mono);text-align:center;color:var(--accent)}
 .formula{font:13px var(--mono);background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:9px 12px;margin:8px 0;overflow-x:auto}
@@ -90,7 +101,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
 @media (max-width:960px){.grid3{grid-template-columns:1fr 1fr}}
 @media (max-width:680px){.grid3,.grid2{grid-template-columns:1fr}}
-.fcard{font-size:14px;color:#e2d2c5}
+.fcard{font-size:14px;color:var(--card-text)}
 .fcard .tag{font:600 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
 .fcard p{margin:6px 0}
 .fcard ul{margin:4px 0;padding-left:18px}
@@ -112,8 +123,9 @@ footer{padding:26px 0 44px;color:var(--dim);font-size:13px;border-top:1px solid 
 
 <header class="hero">
   <div class="wrap">
-    <div class="kicker">Jezero · route planning</div>
-    <h1>Mars rover <span>route map</span></h1>
+    <div><div class="kicker">Jezero · route planning</div>
+    <h1>Mars rover <span>route map</span></h1></div>
+    <button class="btn" id="themeToggle" type="button" title="Switch between light and dark theme" aria-label="Switch between light and dark theme">Light</button>
   </div>
 </header>
 
@@ -511,30 +523,35 @@ loadGlobeTexture(); setCamera(1.026); resizeGlobe(); animateGlobe();
 function drawChart(cv,series,o){
   const dpr=window.devicePixelRatio||1, w=cv.clientWidth, h=200;
   cv.width=w*dpr; cv.height=h*dpr; const c=cv.getContext('2d'); c.setTransform(dpr,0,0,dpr,0,0);
-  if(!series){ c.font='13px Space Grotesk, sans-serif'; c.fillStyle='#806e62'; c.textAlign='center'; c.fillText('Pick two points on the map to see this chart',w/2,h/2); cv._map=null; return; }
+  const th=themeColors();
+  if(!series){ c.font='13px Space Grotesk, sans-serif'; c.fillStyle=th.axis; c.textAlign='center'; c.fillText('Pick two points on the map to see this chart',w/2,h/2); cv._map=null; return; }
   const L=44, R=10, Tp=10, Bt=26, pw=w-L-R, ph=h-Tp-Bt;
   const X=v=>L+v/o.xMax*pw, Y=v=>Tp+ph-(v-o.yMin)/(o.yMax-o.yMin)*ph;
-  c.font='11px JetBrains Mono, monospace'; c.fillStyle='#806e62'; c.strokeStyle='#35261d'; c.lineWidth=1;
+  c.font='11px JetBrains Mono, monospace'; c.fillStyle=th.axis; c.strokeStyle=th.grid; c.lineWidth=1;
   for(let k=0;k<=4;k++){ const v=o.yMin+(o.yMax-o.yMin)*k/4, y=Y(v); c.beginPath(); c.moveTo(L,y); c.lineTo(w-R,y); c.stroke(); c.textAlign='right'; c.fillText(Math.round(v)+(o.unit||''),L-6,y+4); }
   const step=o.xMax>1400?400:o.xMax>700?200:o.xMax>300?100:50;
   c.textAlign='center'; for(let v=0;v<=o.xMax;v+=step) c.fillText(v+' m',X(v),h-8);
   if(o.limit!=null){
-    c.fillStyle='rgba(255,90,90,.08)'; c.fillRect(L,Tp,pw,Math.max(0,Y(o.limit)-Tp));
-    c.save(); c.setLineDash([6,5]); c.strokeStyle='#ff5a5a'; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,Y(o.limit)); c.lineTo(w-R,Y(o.limit)); c.stroke(); c.restore();
+    c.save(); c.globalAlpha=.08; c.fillStyle=th.danger; c.fillRect(L,Tp,pw,Math.max(0,Y(o.limit)-Tp)); c.restore();
+    c.save(); c.setLineDash([6,5]); c.strokeStyle=th.danger; c.lineWidth=1.5; c.beginPath(); c.moveTo(L,Y(o.limit)); c.lineTo(w-R,Y(o.limit)); c.stroke(); c.restore();
   }
   for(const s of series){
     c.save(); if(s.dash) c.setLineDash(s.dash); c.strokeStyle=s.color; c.lineWidth=s.width||2; c.lineJoin='round';
     c.beginPath(); for(let k=0;k<s.xs.length;k++){ const x=X(s.xs[k]), y=Y(clamp(s.ys[k],o.yMin,o.yMax)); k?c.lineTo(x,y):c.moveTo(x,y); } c.stroke(); c.restore();
   }
-  if(o.hoverX!=null){ c.strokeStyle='rgba(255,255,255,.6)'; c.beginPath(); c.moveTo(X(o.hoverX),Tp); c.lineTo(X(o.hoverX),Tp+ph); c.stroke(); }
+  if(o.hoverX!=null){ c.strokeStyle=th.hover; c.beginPath(); c.moveTo(X(o.hoverX),Tp); c.lineTo(X(o.hoverX),Tp+ph); c.stroke(); }
   cv._map={L,pw,xMax:o.xMax};
+}
+function themeColors(){
+  const css=getComputedStyle(document.documentElement), v=name=>css.getPropertyValue(name).trim();
+  return {axis:v('--chart-axis'),grid:v('--chart-grid'),line:v('--chart-line'),hover:v('--chart-hover'),danger:v('--danger')};
 }
 function smooth(a,r){ const o=[]; for(let k=0;k<a.length;k++){ let s=0,n=0; for(let j=k-r;j<=k+r;j++) if(j>=0&&j<a.length){ s+=a[j]; n++; } o.push(s/n); } return o; }
 function drawCharts(){
   if(!safe){ drawChart($('chElev'),null); drawChart($('chSlope'),null); return; }
   const profile=safe.profile, xMax=Math.max(profile.distance_m.at(-1),10);
-  drawChart($('chElev'),[{xs:profile.distance_m,ys:profile.elevation_m,color:'#6fe3ff',width:2.4}],{xMax,yMin:Math.min(...profile.elevation_m),yMax:Math.max(...profile.elevation_m),hoverX});
-  drawChart($('chSlope'),[{xs:profile.distance_m,ys:profile.slope_deg,color:'#6fe3ff',width:2.4}],{xMax,yMin:0,yMax:Math.max(35,Math.ceil(safe.environment.max_slope_deg/5)*5),unit:'°',limit:P.limit,hoverX});
+  drawChart($('chElev'),[{xs:profile.distance_m,ys:profile.elevation_m,color:themeColors().line,width:2.4}],{xMax,yMin:Math.min(...profile.elevation_m),yMax:Math.max(...profile.elevation_m),hoverX});
+  drawChart($('chSlope'),[{xs:profile.distance_m,ys:profile.slope_deg,color:themeColors().line,width:2.4}],{xMax,yMin:0,yMax:Math.max(35,Math.ceil(safe.environment.max_slope_deg/5)*5),unit:'°',limit:P.limit,hoverX});
 }
 function chartHover(e){
   const cv=e.currentTarget, m=cv._map; if(!m||!safe) return;
@@ -733,7 +750,7 @@ function updateHover(hit,event){
   if(!point){tip.style.display='none';return;}
   const rx=Math.round(point.x/(W-1)*(T.renderWidth-1)),ry=Math.round(point.y/(H-1)*(T.renderHeight-1));
   const index=ry*T.renderWidth+rx,slope=T.renderSlope[index],elevation=T.renderH[index],bad=slope>P.limit;
-  tip.innerHTML=`relative elevation ${f1(elevation)} m<br>slope <b style="color:${bad?'#ff7b7b':'#6fe3ff'}">${f1(slope)}°</b>${bad?'<br><b style="color:#ff7b7b">above the 20° limit</b>':''}`;
+  tip.innerHTML=`relative elevation ${f1(elevation)} m<br>slope <b style="color:${bad?'var(--danger)':'var(--safe)'}">${f1(slope)}°</b>${bad?'<br><b style="color:var(--danger)">above the 20° limit</b>':''}`;
   const rect=mb.getBoundingClientRect();let left=event.clientX-rect.left+12,top=event.clientY-rect.top+12;
   if(left>rect.width-155)left-=170;if(top>rect.height-75)top-=85;
   tip.style.left=left+'px';tip.style.top=top+'px';tip.style.display=event.pointerType==='touch'?'none':'block';
@@ -811,8 +828,22 @@ $('calculate').addEventListener('click',()=>{
 
 window.addEventListener('resize',()=>{resizeGlobe();drawCharts();});
 
+/* ---------- theme ---------- */
+function applyTheme(theme){
+  if(theme==='light') document.documentElement.dataset.theme='light'; else delete document.documentElement.dataset.theme;
+  $('themeToggle').textContent=theme==='light'?'Dark':'Light';
+  $('themeToggle').setAttribute('aria-pressed',theme==='light'?'true':'false');
+  drawCharts(); calc();
+}
+$('themeToggle').addEventListener('click',()=>{
+  const next=document.documentElement.dataset.theme==='light'?'dark':'light';
+  try{ localStorage.setItem('theme',next); }catch(e){}
+  applyTheme(next);
+});
+$('themeToggle').textContent=document.documentElement.dataset.theme==='light'?'Dark':'Light';
+
 /* ---------- durma mesafesi hesaplayıcı ---------- */
-const BODIES=[['Mars',3.72,'#ff7a3d'],['Earth',9.81,'#6fe3ff'],['Moon',1.62,'#d9d2c8']];
+const BODIES=[['Mars',3.72,'#ff7a3d'],['Earth',9.81,'#6fe3ff'],['Moon',1.62,'#a89f95']];
 const fD=d=>d<1?f1(d*100)+' cm':(d<1000?f1(d)+' m':(d/1000).toLocaleString('en-US',{maximumFractionDigits:2})+' km');
 function calc(){
   const v=+$('cV').value, deg=+$('cT').value, th=deg/DEG, mu=+$('cMu').value, up=$('cDir').value==='up';
